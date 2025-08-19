@@ -1,8 +1,9 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import json
 import os
 from datetime import datetime
+import asyncio
 
 # Bot setup
 intents = discord.Intents.default()
@@ -11,14 +12,77 @@ intents.guilds = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Channel IDs
-CHANNELS = {
-    'support': 1407347212110925985,
-    'stk': 1407347211049766912,
-    'tos': 1407347205093982310,
-    'rules': 1407347207677677709,
-    'news': 1407347202329940000
-}
+# Channel detection function
+def get_channels_by_name(guild):
+    """Auto-detect channels by name patterns"""
+    channels = {}
+
+    if not guild:
+        return channels
+
+    # Define channel name patterns to look for
+    channel_patterns = {
+        'support': ['support', 'help', 'ticket', 'assistance'],
+        'stk': ['stk', 'gang', 'recruitment', 'join'],
+        'tos': ['tos', 'terms', 'terms-of-service', 'legal'],
+        'rules': ['rules', 'server-rules', 'guidelines'],
+        'news': ['news', 'announcements', 'updates', 'info'],
+        'welcome': ['welcome', 'general', 'main', 'lobby']
+    }
+
+    # Get all text channels in the guild
+    for channel in guild.text_channels:
+        channel_name_lower = channel.name.lower()
+
+        # Check each pattern category
+        for category, patterns in channel_patterns.items():
+            for pattern in patterns:
+                if pattern in channel_name_lower:
+                    if category not in channels:  # Only set if not already found
+                        channels[category] = channel.id
+                    break
+
+    return channels
+
+# Global variable to store detected channels
+CHANNELS = {}
+
+# Welcome message task
+@tasks.loop(minutes=15)
+async def send_welcome_message():
+    """Send welcome message every 15 minutes"""
+    try:
+        # Use the specific welcome channel ID
+        welcome_channel_id = 1407347199477547101
+        welcome_channel = bot.get_channel(welcome_channel_id)
+
+        # If specific channel not found, try to find one
+        if not welcome_channel:
+            for guild in bot.guilds:
+                for channel in guild.text_channels:
+                    channel_name_lower = channel.name.lower()
+                    if any(pattern in channel_name_lower for pattern in ['welcome', 'general', 'main', 'lobby']):
+                        welcome_channel = channel
+                        break
+                if welcome_channel:
+                    break
+
+        # Send welcome message if channel found and bot has permissions
+        if welcome_channel and check_channel_permissions(welcome_channel):
+            embed = create_welcome_embed()
+            await welcome_channel.send(embed=embed)
+            print(f"✅ Welcome message sent to #{welcome_channel.name}")
+        elif welcome_channel:
+            print(f"❌ No permission to send welcome message in #{welcome_channel.name}")
+        else:
+            print("⚠️ No welcome channel found. Create a channel with 'welcome', 'general', or 'main' in the name.")
+
+    except Exception as e:
+        print(f"Error sending welcome message: {e}")
+
+@send_welcome_message.before_loop
+async def before_welcome_message():
+    await bot.wait_until_ready()
 
 # Role IDs
 STAFF_ROLE_ID = 1407347171795406919  # Admin role
@@ -384,23 +448,18 @@ def create_support_embed():
 
 def create_gang_embed():
     embed = discord.Embed(
-        title="⚔️ Join STK Gang",
+        title="🔫 STK SERVER RULES",
         description="**Elite Gang Recruitment Open!**\n\nSTK Gang is recruiting the most skilled and dedicated members. Are you ready to join the elite?",
         color=0x7289da
     )
     embed.add_field(
-        name="🏆 What we offer",
-        value="• Elite member status\n• Exclusive perks\n• Active community\n• Gang events\n• Premium support",
-        inline=True
+        name="📋 STK Server Rules",
+        value="**1.** No Leaking - Don't screenshot, record, or share anything from this server outside of it. What happens here stays here.\n\n**2.** Keep VC Chill - No yelling, trolling, or soundboards unless everyone's with it. Don't ruin the vibe.\n\n**3.** Use the Right Channels - Trade in trade channels. Talk in general. Don't spam.\n\n**4.** No Weird Behavior - Racism, homophobia, harassment — you're out instantly. No second chances.\n\n**5.** No Fakes - Don't act like staff or fake claim STK. Keep it real.",
+        inline=False
     )
     embed.add_field(
-        name="⚡ Requirements",
-        value="• Active participation\n• Loyalty to the gang\n• Respect for members\n• Follow gang rules\n• Regular activity",
-        inline=True
-    )
-    embed.add_field(
-        name="🎯 Gang Stats",
-        value="• Members: 500+\n• Active daily: 200+\n• Gang level: Elite\n• Reputation: ⭐⭐⭐⭐⭐",
+        name="📋 STK Server Rules (Continued)",
+        value="**6.** No Scams or Exploits - Scamming = ban. Exploiting in-game = ban. Don't mess it up for everyone.\n\n**7.** Follow Discord TOS - Don't bring dumb attention. If you're too young or breaking TOS, you're gone.\n\n**8.** Stay Active - If you're inactive too long without saying something, you might be removed.\n\n**9.** Respect Mods & Members - If a mod tells you to chill, just chill. Don't start problems with others for no reason either.\n\n**10.** Must wear: SHIRT- Green Varsity, PANTS- Green Ripped Jeans",
         inline=False
     )
     embed.set_footer(text="STK Gang • Elite Members Only")
@@ -437,31 +496,21 @@ def create_tos_embed():
 
 def create_rules_embed():
     embed = discord.Embed(
-        title="📜 Server Rules",
-        description="**ZSells Discord Server Rules - Follow for a Great Experience**",
+        title="🔫 STK SERVER RULES",
+        description="**STK Gang Server Rules - Follow for Elite Status**",
         color=0xff0000
     )
     embed.add_field(
-        name="💬 Chat Rules",
-        value="• Be respectful to all members\n• No spam or excessive caps\n• English only in main channels\n• No NSFW content\n• Use appropriate channels",
+        name="📋 STK Server Rules",
+        value="**1.** No Leaking - Don't screenshot, record, or share anything from this server outside of it. What happens here stays here.\n\n**2.** Keep VC Chill - No yelling, trolling, or soundboards unless everyone's with it. Don't ruin the vibe.\n\n**3.** Use the Right Channels - Trade in trade channels. Talk in general. Don't spam.\n\n**4.** No Weird Behavior - Racism, homophobia, harassment — you're out instantly. No second chances.\n\n**5.** No Fakes - Don't act like staff or fake claim STK. Keep it real.",
         inline=False
     )
     embed.add_field(
-        name="🛡️ Behavior Guidelines",
-        value="• No harassment or bullying\n• No advertising other servers\n• No impersonation\n• No drama or arguments\n• Respect staff decisions",
+        name="📋 STK Server Rules (Continued)",
+        value="**6.** No Scams or Exploits - Scamming = ban. Exploiting in-game = ban. Don't mess it up for everyone.\n\n**7.** Follow Discord TOS - Don't bring dumb attention. If you're too young or breaking TOS, you're gone.\n\n**8.** Stay Active - If you're inactive too long without saying something, you might be removed.\n\n**9.** Respect Mods & Members - If a mod tells you to chill, just chill. Don't start problems with others for no reason either.\n\n**10.** Must wear: SHIRT- Green Varsity, PANTS- Green Ripped Jeans",
         inline=False
     )
-    embed.add_field(
-        name="🎫 Support Rules",
-        value="• One ticket per issue\n• Provide detailed information\n• Be patient with staff\n• No spam tickets\n• Use tickets for support only",
-        inline=False
-    )
-    embed.add_field(
-        name="⚠️ Consequences",
-        value="• **Warning** → First offense\n• **Mute** → Repeated violations\n• **Kick** → Serious violations\n• **Ban** → Severe/repeated violations\n• **Permanent Ban** → ToS violations",
-        inline=False
-    )
-    embed.set_footer(text="ZSells Rules • Staff have final say • Report issues to staff")
+    embed.set_footer(text="STK Gang • Elite Members Only • Staff have final say")
     return embed
 
 def create_news_embed():
@@ -472,6 +521,40 @@ def create_news_embed():
         timestamp=datetime.fromisoformat(NEWS_DATA["last_updated"]) if NEWS_DATA["last_updated"] else None
     )
     embed.set_footer(text="ZSells News • Stay updated with latest announcements")
+    return embed
+
+def create_welcome_embed():
+    embed = discord.Embed(
+        title="🎉 Welcome to ZSells Premium Services!",
+        description="**The #1 Premium Gaming Services Provider**\n\nWelcome to our exclusive community! We provide top-tier services for all your gaming needs.",
+        color=0x00ff00
+    )
+    embed.add_field(
+        name="🛒 Our Premium Services",
+        value="• **Weapons** - Premium collection with package options\n• **Money & Bank** - Fast delivery, secure transactions\n• **Luxury Watches** - Exclusive collection, $1 each\n• **24/7 Support** - Expert assistance anytime\n• **Elite Gang Access** - Join STK Gang recruitment",
+        inline=False
+    )
+    embed.add_field(
+        name="💎 Why Choose ZSells?",
+        value="✅ Instant delivery\n✅ Competitive prices\n✅ 99% customer satisfaction\n✅ Secure payments\n✅ Professional support team\n✅ Elite community access",
+        inline=True
+    )
+    embed.add_field(
+        name="🚀 Get Started Now!",
+        value="• Use `/shop` for our interactive store\n• Create a support ticket for help\n• Join STK Gang for elite perks\n• Check out our premium packages",
+        inline=True
+    )
+    embed.add_field(
+        name="💳 Payment Methods",
+        value="💰 PayPal • 🪙 Crypto • 💵 CashApp • 💳 Venmo",
+        inline=False
+    )
+    embed.add_field(
+        name="📞 Contact Information",
+        value="Discord: Z Supply#1234\nWebsite: zsupply.com\nEmail: orders@zsupply.com",
+        inline=False
+    )
+    embed.set_footer(text="ZSells Premium Services • Your trusted gaming partner since 2024")
     return embed
 
 # Original embed functions (keeping existing functionality)
@@ -596,7 +679,7 @@ def create_contact_embed():
     )
     embed.add_field(
         name="💳 Payment Methods",
-        value="• PayPal\n• Crypto\n• CashApp\n• Venmo",
+        value="• PayPal • Apple Pay",
         inline=True
     )
     embed.add_field(
@@ -606,7 +689,7 @@ def create_contact_embed():
     )
     embed.add_field(
         name="📞 Contact Z Supply",
-        value="Discord: Z Supply#1234\nWebsite: zsupply.com\nEmail: orders@zsupply.com",
+        value="Contact: <@1385239185006268457>",
         inline=False
     )
     embed.set_footer(text="Contact us to complete your order!")
@@ -637,12 +720,12 @@ def create_order_info_embed(weapons, package_type):
 
     embed.add_field(
         name="📞 Contact to Order",
-        value="Discord: Z Supply#1234\nWebsite: zsupply.com\nEmail: orders@zsupply.com",
+        value="Contact: <@1385239185006268457>",
         inline=False
     )
     embed.add_field(
         name="💳 Payment Methods",
-        value="PayPal • Crypto • CashApp • Venmo",
+        value="PayPal • Apple Pay",
         inline=False
     )
 
@@ -661,12 +744,12 @@ def create_money_info_embed(item, price):
 
     embed.add_field(
         name="📞 Contact to Order",
-        value="Discord: Z Supply#1234\nWebsite: zsupply.com\nEmail: orders@zsupply.com",
+        value="Contact: <@1385239185006268457>",
         inline=False
     )
     embed.add_field(
         name="💳 Payment Methods",
-        value="PayPal • Crypto • CashApp • Venmo",
+        value="PayPal • Apple Pay",
         inline=False
     )
 
@@ -685,12 +768,12 @@ def create_watch_info_embed(watch):
 
     embed.add_field(
         name="📞 Contact to Order",
-        value="Discord: Z Supply#1234\nWebsite: zsupply.com\nEmail: orders@zsupply.com",
+        value="Contact: <@1385239185006268457>",
         inline=False
     )
     embed.add_field(
         name="💳 Payment Methods",
-        value="PayPal • Crypto • CashApp • Venmo",
+        value="PayPal • Apple Pay",
         inline=False
     )
 
@@ -716,12 +799,12 @@ def create_multi_watch_info_embed(watches):
 
     embed.add_field(
         name="📞 Contact to Order",
-        value="Discord: Z Supply#1234\nWebsite: zsupply.com\nEmail: orders@zsupply.com",
+        value="Contact: <@1385239185006268457>",
         inline=False
     )
     embed.add_field(
         name="💳 Payment Methods",
-        value="PayPal • Crypto • CashApp • Venmo",
+        value="PayPal • Apple Pay",
         inline=False
     )
 
@@ -730,11 +813,27 @@ def create_multi_watch_info_embed(watches):
 
 @bot.event
 async def on_ready():
+    global CHANNELS
     load_data()
 
     # Add persistent views
     bot.add_view(SupportView())
     bot.add_view(GangRecruitmentView())
+
+    # Auto-detect channels for each guild the bot is in
+    for guild in bot.guilds:
+        detected_channels = get_channels_by_name(guild)
+        CHANNELS.update(detected_channels)
+
+        print(f"📡 Auto-detected channels in {guild.name}:")
+        for channel_type, channel_id in detected_channels.items():
+            channel = guild.get_channel(channel_id)
+            if channel:
+                print(f"  • {channel_type}: #{channel.name} (ID: {channel_id})")
+
+        if not detected_channels:
+            print(f"  ⚠️  No matching channels found in {guild.name}")
+            print(f"     Create channels with names like: support, rules, news, etc.")
 
     # Auto-setup all embeds in their respective channels
     await auto_setup_all_embeds()
@@ -745,84 +844,195 @@ async def on_ready():
     except Exception as e:
         print(f'Failed to sync commands: {e}')
 
+    # Start the welcome message task
+    if not send_welcome_message.is_running():
+        send_welcome_message.start()
+        print("✅ Welcome message task started (every 15 minutes)")
+
     print(f'{bot.user} has connected to Discord!')
     print('Bot is ready with all systems!')
 
 async def auto_setup_all_embeds():
     """Automatically setup all embeds in their respective channels"""
     try:
+        # First check if bot has basic permissions in any guild
+        has_any_permissions = False
+        for guild in bot.guilds:
+            if check_bot_permissions_in_guild(guild):
+                has_any_permissions = True
+                break
+
+        if not has_any_permissions:
+            print("❌ Bot lacks basic permissions in all guilds. Please check bot permissions:")
+            print("   • Send Messages")
+            print("   • Embed Links") 
+            print("   • View Channel")
+            print("   • Read Message History")
+            return
+
         # Setup support panel
-        support_channel = bot.get_channel(CHANNELS['support'])
-        if support_channel:
-            embed = create_support_embed()
-            view = SupportView()
-            await support_channel.send(embed=embed, view=view)
-            print("✅ Support panel auto-setup complete!")
+        if 'support' in CHANNELS:
+            support_channel = bot.get_channel(CHANNELS['support'])
+            if support_channel and check_channel_permissions(support_channel):
+                try:
+                    embed = create_support_embed()
+                    view = SupportView()
+                    await support_channel.send(embed=embed, view=view)
+                    print("✅ Support panel auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{support_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up support panel: {e}")
+            elif support_channel:
+                print(f"❌ Missing permissions in #{support_channel.name}")
 
         # Setup gang recruitment
-        stk_channel = bot.get_channel(CHANNELS['stk'])
-        if stk_channel:
-            embed = create_gang_embed()
-            view = GangRecruitmentView()
-            await stk_channel.send(embed=embed, view=view)
-            print("✅ Gang recruitment panel auto-setup complete!")
+        if 'stk' in CHANNELS:
+            stk_channel = bot.get_channel(CHANNELS['stk'])
+            if stk_channel and check_channel_permissions(stk_channel):
+                try:
+                    embed = create_gang_embed()
+                    view = GangRecruitmentView()
+                    await stk_channel.send(embed=embed, view=view)
+                    print("✅ Gang recruitment panel auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{stk_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up gang recruitment: {e}")
+            elif stk_channel:
+                print(f"❌ Missing permissions in #{stk_channel.name}")
 
         # Setup ToS
-        tos_channel = bot.get_channel(CHANNELS['tos'])
-        if tos_channel:
-            embed = create_tos_embed()
-            await tos_channel.send(embed=embed)
-            print("✅ Terms of Service auto-setup complete!")
+        if 'tos' in CHANNELS:
+            tos_channel = bot.get_channel(CHANNELS['tos'])
+            if tos_channel and check_channel_permissions(tos_channel):
+                try:
+                    embed = create_tos_embed()
+                    await tos_channel.send(embed=embed)
+                    print("✅ Terms of Service auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{tos_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up ToS: {e}")
+            elif tos_channel:
+                print(f"❌ Missing permissions in #{tos_channel.name}")
 
         # Setup Rules
-        rules_channel = bot.get_channel(CHANNELS['rules'])
-        if rules_channel:
-            embed = create_rules_embed()
-            await rules_channel.send(embed=embed)
-            print("✅ Server rules auto-setup complete!")
+        if 'rules' in CHANNELS:
+            rules_channel = bot.get_channel(CHANNELS['rules'])
+            if rules_channel and check_channel_permissions(rules_channel):
+                try:
+                    embed = create_rules_embed()
+                    await rules_channel.send(embed=embed)
+                    print("✅ Server rules auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{rules_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up rules: {e}")
+            elif rules_channel:
+                print(f"❌ Missing permissions in #{rules_channel.name}")
 
-        # Setup News
-        news_channel = bot.get_channel(CHANNELS['news'])
-        if news_channel:
-            if not NEWS_DATA["last_updated"]:
-                NEWS_DATA["last_updated"] = datetime.now().isoformat()
-                save_data()
-            embed = create_news_embed()
-            await news_channel.send(embed=embed)
-            print("✅ News channel auto-setup complete!")
+        # Setup News - skip auto-setup to avoid permission issues
+        if 'news' in CHANNELS:
+            news_channel = bot.get_channel(CHANNELS['news'])
+            if news_channel and check_channel_permissions(news_channel):
+                try:
+                    if not NEWS_DATA["last_updated"]:
+                        NEWS_DATA["last_updated"] = datetime.now().isoformat()
+                        save_data()
+                    # Skip auto-sending news to avoid permission issues
+                    print("✅ News channel detected - use /admin to spawn news panel")
+                except Exception as e:
+                    print(f"❌ Error with news setup: {e}")
+            elif news_channel:
+                print(f"❌ Missing permissions in #{news_channel.name}")
 
     except Exception as e:
         print(f"Error in auto-setup: {e}")
 
 # Admin Panel Classes
 class ChannelSelectView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, guild):
         super().__init__(timeout=300)
+        self.guild = guild
+        self.add_channel_select()
 
-    @discord.ui.select(
-        placeholder="Select a channel to spawn embeds in...",
-        options=[
-            discord.SelectOption(label="Support Channel", value="support", emoji="🎫"),
-            discord.SelectOption(label="STK Gang Channel", value="stk", emoji="⚔️"),
-            discord.SelectOption(label="Terms of Service Channel", value="tos", emoji="📋"),
-            discord.SelectOption(label="Rules Channel", value="rules", emoji="📜"),
-            discord.SelectOption(label="News Channel", value="news", emoji="📰"),
-            discord.SelectOption(label="Current Channel", value="current", emoji="📍")
-        ]
-    )
-    async def channel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
-        selected_channel = select.values[0]
-        
+    def add_channel_select(self):
+        # Create options for detected channels
+        options = []
+
+        # Add current channel option
+        options.append(discord.SelectOption(label="Current Channel", value="current", emoji="📍"))
+
+        # Add detected channels
+        channel_emojis = {
+            'support': '🎫',
+            'stk': '⚔️', 
+            'tos': '📋',
+            'rules': '📜',
+            'news': '📰'
+        }
+
+        for channel_type, channel_id in CHANNELS.items():
+            channel = self.guild.get_channel(channel_id) if self.guild else bot.get_channel(channel_id)
+            if channel:
+                emoji = channel_emojis.get(channel_type, '📢')
+                label = f"#{channel.name}"
+                options.append(discord.SelectOption(
+                    label=label,
+                    value=channel_type,
+                    emoji=emoji,
+                    description=f"{channel_type.title()} channel"
+                ))
+
+        # Add all other text channels in the guild
+        if self.guild:
+            other_channels = [ch for ch in self.guild.text_channels 
+                           if ch.id not in CHANNELS.values()][:15]  # Limit to 15 to avoid Discord limits
+
+            for channel in other_channels:
+                if len(options) < 25:  # Discord limit
+                    options.append(discord.SelectOption(
+                        label=f"#{channel.name}",
+                        value=f"other_{channel.id}",
+                        emoji="📝",
+                        description="Other channel"
+                    ))
+
+        if not options:
+            options.append(discord.SelectOption(label="No channels available", value="none", emoji="❌"))
+
+        select = discord.ui.Select(
+            placeholder="Select a channel to spawn embeds in...",
+            options=options[:25]  # Discord limit
+        )
+        select.callback = self.channel_select
+        self.add_item(select)
+
+    async def channel_select(self, interaction: discord.Interaction):
+        # Check if user is authorized
+        if interaction.user.id != AUTHORIZED_USER_ID:
+            await interaction.response.send_message("❌ You are not authorized to use this dropdown.", ephemeral=True)
+            return
+
+        selected_value = interaction.data['values'][0]
+
         # Get the target channel
-        if selected_channel == "current":
+        if selected_value == "current":
             target_channel = interaction.channel
+        elif selected_value == "none":
+            await interaction.response.send_message("❌ No channels available!", ephemeral=True)
+            return
+        elif selected_value.startswith("other_"):
+            channel_id = int(selected_value.replace("other_", ""))
+            target_channel = bot.get_channel(channel_id)
         else:
-            target_channel = bot.get_channel(CHANNELS.get(selected_channel))
-        
+            target_channel = bot.get_channel(CHANNELS.get(selected_value))
+
         if not target_channel:
             await interaction.response.send_message("❌ Selected channel not found!", ephemeral=True)
             return
-        
+
         # Show the embed spawn panel
         embed = create_admin_spawn_embed(target_channel)
         view = EmbedSpawnView(target_channel)
@@ -835,51 +1045,170 @@ class EmbedSpawnView(discord.ui.View):
 
     @discord.ui.button(label='Support Panel', style=discord.ButtonStyle.primary, emoji='🎫')
     async def spawn_support(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_support_embed()
-        view = SupportView()
-        await self.target_channel.send(embed=embed, view=view)
-        await interaction.response.send_message(f"✅ Support panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            embed = create_support_embed()
+            view = SupportView()
+            await self.target_channel.send(embed=embed, view=view)
+            await interaction.response.send_message(f"✅ Support panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning support panel: {str(e)}", ephemeral=True)
 
     @discord.ui.button(label='Gang Recruitment', style=discord.ButtonStyle.success, emoji='⚔️')
     async def spawn_gang(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_gang_embed()
-        view = GangRecruitmentView()
-        await self.target_channel.send(embed=embed, view=view)
-        await interaction.response.send_message(f"✅ Gang recruitment panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            embed = create_gang_embed()
+            view = GangRecruitmentView()
+            await self.target_channel.send(embed=embed, view=view)
+            await interaction.response.send_message(f"✅ Gang recruitment panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning gang recruitment: {str(e)}", ephemeral=True)
 
     @discord.ui.button(label='Terms of Service', style=discord.ButtonStyle.secondary, emoji='📋')
     async def spawn_tos(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_tos_embed()
-        await self.target_channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ Terms of Service spawned in {self.target_channel.mention}!", ephemeral=True)
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            embed = create_tos_embed()
+            await self.target_channel.send(embed=embed)
+            await interaction.response.send_message(f"✅ Terms of Service spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning ToS: {str(e)}", ephemeral=True)
 
     @discord.ui.button(label='Server Rules', style=discord.ButtonStyle.secondary, emoji='📜')
     async def spawn_rules(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_rules_embed()
-        await self.target_channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ Server rules spawned in {self.target_channel.mention}!", ephemeral=True)
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            embed = create_rules_embed()
+            await self.target_channel.send(embed=embed)
+            await interaction.response.send_message(f"✅ Server rules spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning rules: {str(e)}", ephemeral=True)
 
     @discord.ui.button(label='News Panel', style=discord.ButtonStyle.secondary, emoji='📰')
     async def spawn_news(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not NEWS_DATA["last_updated"]:
-            NEWS_DATA["last_updated"] = datetime.now().isoformat()
-            save_data()
-        embed = create_news_embed()
-        await self.target_channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ News panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            if not NEWS_DATA["last_updated"]:
+                NEWS_DATA["last_updated"] = datetime.now().isoformat()
+                save_data()
+            embed = create_news_embed()
+            await self.target_channel.send(embed=embed)
+            await interaction.response.send_message(f"✅ News panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning news panel: {str(e)}", ephemeral=True)
 
     @discord.ui.button(label='Shop Panel', style=discord.ButtonStyle.danger, emoji='🛒', row=1)
     async def spawn_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_main_shop_embed()
-        view = MainShopView()
-        await self.target_channel.send(embed=embed, view=view)
-        await interaction.response.send_message(f"✅ Shop panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
 
-    @discord.ui.button(label='Back to Channel Select', style=discord.ButtonStyle.primary, emoji='🔙', row=1)
-    async def back_to_select(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_admin_panel_embed()
-        view = ChannelSelectView()
-        await interaction.response.edit_message(embed=embed, view=view)
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            embed = create_main_shop_embed()
+            view = MainShopView()
+            await self.target_channel.send(embed=embed, view=view)
+            await interaction.response.send_message(f"✅ Shop panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning shop panel: {str(e)}", ephemeral=True)
+
+    @discord.ui.button(label='Welcome Panel', style=discord.ButtonStyle.success, emoji='🎉', row=1)
+    async def spawn_welcome(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        # Check bot permissions
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}. Please ensure the bot has 'Send Messages' and 'Embed Links' permissions.", ephemeral=True)
+            return
+
+        try:
+            embed = create_welcome_embed()
+            await self.target_channel.send(embed=embed)
+            await interaction.response.send_message(f"✅ Welcome panel spawned in {self.target_channel.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message(f"❌ Missing permissions to send messages in {self.target_channel.mention}. Please check bot permissions.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error spawning welcome panel: {str(e)}", ephemeral=True)
+
+    @discord.ui.button(label='Close Panel', style=discord.ButtonStyle.primary, emoji='❌', row=1)
+    async def close_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Check if user is authorized
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="✅ Admin Panel Closed",
+            description="Admin panel has been closed.",
+            color=0x95a5a6
+        )
+        await interaction.response.edit_message(embed=embed, view=None)
 
 # Admin Panel Embed Functions
 def create_admin_panel_embed():
@@ -888,14 +1217,30 @@ def create_admin_panel_embed():
         description="**Master control panel for all bot functions**\n\nSelect a channel below to spawn embeds and panels.",
         color=0x7289da
     )
-    embed.add_field(
-        name="📍 Available Channels",
-        value="• Support Channel\n• STK Gang Channel\n• Terms of Service Channel\n• Rules Channel\n• News Channel\n• Current Channel",
-        inline=True
-    )
+
+    # Show detected channels
+    detected_channels = []
+    for channel_type, channel_id in CHANNELS.items():
+        channel = bot.get_channel(channel_id)
+        if channel:
+            detected_channels.append(f"• #{channel.name} ({channel_type})")
+
+    if detected_channels:
+        embed.add_field(
+            name="📡 Auto-Detected Channels",
+            value="\n".join(detected_channels) if detected_channels else "No channels detected",
+            inline=True
+        )
+    else:
+        embed.add_field(
+            name="⚠️ Channel Detection",
+            value="No channels auto-detected.\nCreate channels with names like:\n• support, help, tickets\n• rules, guidelines\n• news, announcements\n• stk, gang, recruitment",
+            inline=True
+        )
+
     embed.add_field(
         name="🎛️ Available Panels",
-        value="• Support Panel (with tickets)\n• Gang Recruitment\n• Terms of Service\n• Server Rules\n• News Panel\n• Shop Panel",
+        value="• Support Panel (with tickets)\n• Gang Recruitment\n• Terms of Service\n• Server Rules\n• News Panel\n• Shop Panel\n• Welcome Panel (auto-sends every 15min)",
         inline=True
     )
     embed.add_field(
@@ -903,7 +1248,7 @@ def create_admin_panel_embed():
         value="1. Select a channel from the dropdown\n2. Choose which embed to spawn\n3. Confirm the action\n4. Panel will appear instantly!",
         inline=False
     )
-    embed.set_footer(text="ZSells Admin Panel • Requires Admin Permissions")
+    embed.set_footer(text="ZSells Admin Panel • Auto-detection enabled")
     return embed
 
 def create_admin_spawn_embed(target_channel):
@@ -914,7 +1259,7 @@ def create_admin_spawn_embed(target_channel):
     )
     embed.add_field(
         name="🎫 Interactive Panels",
-        value="• Support Panel (tickets + buttons)\n• Gang Recruitment (join button)\n• Shop Panel (full interactive shop)",
+        value="• Support Panel (tickets + buttons)\n• Gang Recruitment (join button)\n• Shop Panel (full interactive shop)\n• Welcome Panel (service promotion)",
         inline=True
     )
     embed.add_field(
@@ -938,19 +1283,19 @@ AUTHORIZED_USER_ID = 1385239185006268457
 async def admin_panel(interaction: discord.Interaction):
     """Open the unified admin control panel"""
     # Check if user is authorized
-    if interaction.user.id != AUTHORIZED_USER_ID:
+    if not has_admin_permissions(interaction.user, interaction.guild):
         await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
         return
 
-    embed = create_admin_panel_embed()
-    view = ChannelSelectView()
+    embed = create_admin_spawn_embed(interaction.channel)
+    view = EmbedSpawnView(interaction.channel)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 @bot.tree.command(name='shop', description='Open the interactive shop')
 async def shop_slash(interaction: discord.Interaction):
     """Open the main interactive shop"""
     # Check if user is authorized
-    if interaction.user.id != AUTHORIZED_USER_ID:
+    if not has_admin_permissions(interaction.user, interaction.guild):
         await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
         return
 
@@ -962,7 +1307,7 @@ async def shop_slash(interaction: discord.Interaction):
 async def news_command(interaction: discord.Interaction, title: str = None, content: str = None):
     """Update the news content"""
     # Check if user is authorized
-    if interaction.user.id != AUTHORIZED_USER_ID:
+    if not has_admin_permissions(interaction.user, interaction.guild):
         await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
         return
 
@@ -977,6 +1322,49 @@ async def news_command(interaction: discord.Interaction, title: str = None, cont
     save_data()
 
     await interaction.response.send_message("✅ News content updated! Use `/admin` to spawn the updated news panel.", ephemeral=True)
+
+@bot.tree.command(name='refresh_channels', description='Refresh auto-detected channels')
+async def refresh_channels(interaction: discord.Interaction):
+    """Refresh the auto-detected channels"""
+    # Check if user is authorized
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    global CHANNELS
+    CHANNELS.clear()
+
+    # Re-detect channels for each guild
+    for guild in bot.guilds:
+        detected_channels = get_channels_by_name(guild)
+        CHANNELS.update(detected_channels)
+
+    embed = discord.Embed(
+        title="🔄 Channels Refreshed",
+        description="Auto-detection has been refreshed!",
+        color=0x00ff00
+    )
+
+    if CHANNELS:
+        channel_list = []
+        for channel_type, channel_id in CHANNELS.items():
+            channel = bot.get_channel(channel_id)
+            if channel:
+                channel_list.append(f"• #{channel.name} ({channel_type})")
+
+        embed.add_field(
+            name="📡 Detected Channels",
+            value="\n".join(channel_list),
+            inline=False
+        )
+    else:
+        embed.add_field(
+            name="⚠️ No Channels Detected",
+            value="Create channels with names like: support, rules, news, stk, etc.",
+            inline=False
+        )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # Error handling
 @bot.event
@@ -993,31 +1381,47 @@ async def on_command_error(ctx, error):
 
 # Helper function for permission checking
 def has_admin_permissions(user, guild):
-    """Check if user has admin permissions or required roles"""
-    if not user or not guild:
+    """Check if user has admin permissions - restricted to authorized user only"""
+    if not user:
         return False
 
+    # Only allow the specific authorized user
+    return user.id == AUTHORIZED_USER_ID
+
+def check_bot_permissions_in_guild(guild):
+    """Check if bot has basic permissions in the guild"""
     try:
-        # Get the member object from the guild
-        member = guild.get_member(user.id)
-        if not member:
+        if not guild:
             return False
 
-        # Check admin permissions safely
-        try:
-            if member.guild_permissions.administrator or member.guild_permissions.manage_guild:
-                return True
-        except (AttributeError, TypeError):
-            pass
+        bot_member = guild.me
+        if not bot_member:
+            return False
 
-        # Check required roles
-        try:
-            user_role_ids = [role.id for role in member.roles if role]
-            return STAFF_ROLE_ID in user_role_ids or OWNER_ROLE_ID in user_role_ids
-        except (AttributeError, TypeError):
-            pass
+        # Check if bot has basic permissions
+        permissions = bot_member.guild_permissions
+        return (permissions.send_messages and 
+                permissions.embed_links and 
+                permissions.view_channel and
+                permissions.read_message_history)
 
+    except Exception:
         return False
+
+def check_channel_permissions(channel):
+    """Check if bot has permission to send messages in the channel"""
+    try:
+        if not channel:
+            return False
+
+        # Get bot member in the guild
+        bot_member = channel.guild.me
+        if not bot_member:
+            return False
+
+        # Check permissions
+        permissions = channel.permissions_for(bot_member)
+        return permissions.send_messages and permissions.embed_links
 
     except Exception:
         return False
