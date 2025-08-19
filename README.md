@@ -1,156 +1,127 @@
 
-# Professional E-commerce Template
+# STK Supply Discord Bot
 
-A modern, responsive e-commerce website template with full shopping cart functionality, sidebar navigation, and professional styling.
+A Discord bot that displays your shop inventory using rich embed messages. Perfect for showcasing weapons, money packages, and watches with an interactive command system.
 
 ## Features
 
-### 🛒 Complete Shopping Cart System
-- Add/remove items from cart
-- Quantity management
-- Real-time total calculation
-- Cart persistence with localStorage
-- Smooth checkout process
+### 🤖 Discord Bot Commands
+- `!shop` - Main shop menu with categories
+- `!weapons` - Browse weapon selection with packages
+- `!money` - View money and bank options
+- `!watches` - Browse luxury watch collection
+- `!cart` - View order format and contact info
+- `!help_shop` - Complete command list
 
-### 🎨 Professional Design
-- Modern, clean interface
-- Responsive design for all devices
-- Smooth animations and transitions
-- Professional color scheme
-- Font Awesome icons
+### 🛒 Shop Categories
+- **Weapons**: 27+ weapons with 3 package options (Safe $3, Bag $2, Trunk $1)
+- **Money**: Regular ($1) and Gamepass ($2) money packages
+- **Watches**: 16 luxury watches at $1 each
 
-### 📱 Mobile-First Responsive
-- Fully responsive sidebar and cart
-- Optimized for mobile, tablet, and desktop
-- Touch-friendly interface
-- Adaptive layouts
+### 🎨 Rich Embeds
+- Professional Discord embed messages
+- Color-coded categories
+- Emoji icons for visual appeal
+- Organized field layouts
+- Interactive command system
 
-### 🔍 Advanced Features
-- Product search functionality
-- Category filtering
-- Price range filtering
-- Brand filtering
-- Product modal with detailed view
+## Setup Instructions
 
-### 📋 Ready-to-Use Sections
-- Hero section with call-to-action
-- Featured products grid
-- About section with features
-- Contact form
-- Professional footer
+### 1. Create Discord Bot
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a new application
+3. Go to the "Bot" section
+4. Create a bot and copy the token
+5. Enable "Message Content Intent" in bot settings
 
-## Quick Start
+### 2. Configure Replit
+1. Open the Secrets tab in Replit
+2. Add a new secret:
+   - Key: `DISCORD_BOT_TOKEN`
+   - Value: Your Discord bot token
 
-1. **Clone or download** this template
-2. **Customize the content**:
-   - Update `index.html` with your business information
-   - Modify `script.js` to add your products
-   - Adjust colors and styling in `style.css`
-3. **Run the server**:
-   ```bash
-   python server.py
-   ```
-4. **Open your browser** and navigate to the displayed URL
+### 3. Invite Bot to Server
+1. In Discord Developer Portal, go to OAuth2 > URL Generator
+2. Select scopes: `bot`
+3. Select permissions: `Send Messages`, `Use Slash Commands`, `Embed Links`
+4. Copy the generated URL and invite the bot to your server
 
-## Customization Guide
-
-### Adding Products
-
-Edit the `sampleProducts` array in `script.js`:
-
-```javascript
-const sampleProducts = [
-    {
-        id: 1,
-        name: "Your Product Name",
-        price: 99.99,
-        category: "electronics", // electronics, clothing, home, sports, books
-        brand: "brand1", // brand1, brand2, brand3
-        description: "Product description here",
-        image: "🔥" // Use emoji or replace with actual image URLs
-    }
-    // Add more products...
-];
+### 4. Run the Bot
+```bash
+python discord_bot.py
 ```
 
-### Customizing Colors
+## Commands Usage
 
-Main color variables in `style.css`:
-- Primary: `#3498db` (blue)
-- Success: `#27ae60` (green)
-- Warning: `#f39c12` (orange)
-- Danger: `#e74c3c` (red)
-- Dark: `#2c3e50`
-- Light: `#ecf0f1`
+### Basic Shop Navigation
+```
+!shop                    # Main menu
+!weapons                 # View all weapons
+!money                   # View money options
+!watches                 # View watch collection
+```
 
-### Updating Business Information
+### Weapon Selection
+```
+!weapons                           # Show all weapons
+!weapons GoldenButton              # Show packages for GoldenButton
+!weapons GoldenButton safe         # Order GoldenButton + Safe Package
+```
 
-1. **Header**: Change logo and company name in `index.html`
-2. **Hero Section**: Update welcome message and call-to-action
-3. **About Section**: Replace with your business information
-4. **Contact Section**: Update contact details and form
-5. **Footer**: Customize footer links and information
+### Money Packages
+```
+!money                   # Show all options
+!money regular           # Show regular packages ($1)
+!money gamepass          # Show gamepass packages ($2)
+```
 
-### Categories and Filters
+## Customization
 
-Update categories in the sidebar by modifying:
-- Category list in `index.html`
-- Filter functions in `script.js`
-- Add corresponding products with matching category names
+### Adding New Products
+Edit the arrays in `discord_bot.py`:
+- `WEAPONS` - Add new weapon names
+- `PACKAGES` - Modify package options and prices
+- `MONEY_OPTIONS` - Update money packages
+- `WATCHES` - Add new watch models
+
+### Changing Colors
+Modify the `color` parameter in embed creation:
+```python
+embed = discord.Embed(color=0xFF6B6B)  # Red
+embed = discord.Embed(color=0x4ECDC4)  # Teal
+embed = discord.Embed(color=0x95E1D3)  # Green
+```
+
+### Custom Emojis
+Replace default emojis with custom server emojis:
+```python
+"emoji": "<:custom_emoji:123456789>"
+```
+
+## Deployment
+
+The bot is ready for deployment on Replit:
+1. Set up your Discord bot token in Secrets
+2. Click the Deploy button in Replit
+3. Choose "Reserved VM" for 24/7 uptime
+4. Your bot will stay online continuously
 
 ## File Structure
 
 ```
-├── index.html          # Main HTML structure
-├── style.css           # All styling and responsive design
-├── script.js           # Cart system and functionality
-├── server.py           # Python development server
-├── .replit             # Replit configuration
-└── README.md           # This file
+├── discord_bot.py      # Main bot code with commands
+├── requirements.txt    # Python dependencies
+├── README.md          # This documentation
+└── .replit            # Replit configuration
 ```
-
-## Browser Support
-
-- ✅ Chrome (recommended)
-- ✅ Firefox
-- ✅ Safari
-- ✅ Edge
-- ✅ Mobile browsers
-
-## Development Server
-
-The included `server.py` automatically finds an available port and serves your files:
-
-```bash
-python server.py
-```
-
-Features:
-- Automatic port detection (5000-5099)
-- CORS enabled for development
-- Serves static files
-- Clean shutdown on Ctrl+C
-
-## Deployment
-
-This template is ready for deployment on any static hosting platform:
-
-1. **Replit**: Already configured - just click "Deploy"
-2. **Netlify**: Drag and drop the files
-3. **Vercel**: Connect your repository
-4. **GitHub Pages**: Push to a repository
-
-## License
-
-This template is free to use for personal and commercial projects. No attribution required, but appreciated!
 
 ## Support
 
 For questions or customization help:
-- Check the code comments in each file
-- Review the examples in `script.js`
-- Modify the sample data to match your needs
+- Check Discord.py documentation
+- Review the command examples in the code
+- Test commands in your Discord server
 
----
+## License
 
-**Happy selling!** 🚀
+Free to use for personal and commercial projects.

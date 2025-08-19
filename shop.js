@@ -1,5 +1,5 @@
 
-// Enhanced Shop Functionality
+// Enhanced Shop Functionality for STK Supply
 class ShopManager {
     constructor() {
         this.products = [];
@@ -8,12 +8,14 @@ class ShopManager {
         this.currentPage = 1;
         this.itemsPerPage = 12;
         this.filters = {
-            category: 'all',
+            category: 'weapons',
+            subcategory: 'all',
             priceRange: 1000,
             brands: [],
             ratings: [],
             search: ''
         };
+        this.selectedWeapon = null;
         this.sortBy = 'featured';
         this.viewMode = 'grid';
         
@@ -24,156 +26,55 @@ class ShopManager {
         this.loadProducts();
         this.loadCartFromStorage();
         this.bindEvents();
-        this.filters.category = 'weapons'; // Set default category
-        this.updateFilters();
         this.renderProducts();
         this.updateCartUI();
         this.handleURLParams();
     }
     
     loadProducts() {
+        // Weapon List - All weapons are free
+        this.weapons = [
+            "GoldenButton", "GreenSwitch", "BlueTips/Switch", "OrangeButton", "BinaryTrigger",
+            "YellowButtonSwitch", "FullyARP", "FullyDraco", "Fully-MicroAR", "Cyanbutton",
+            "100RndTanG19", "300ARG", "VP9Scope", "MasterPiece30", "GSwitch",
+            "G17WittaButton", "G19Switch", "G20Switch", "G21Switch", "G22 Switch",
+            "G23 Switch", "G40 Switch", "G42 Switch", "Fully-FN", "BinaryARP",
+            "BinaryDraco", "CustomAR9"
+        ];
+
         // STK Supply Product Catalog
         this.products = [
-            // Weapons
-            {
-                id: 1,
-                name: "Street Arsenal - Safe",
-                price: 3.00,
-                category: "weapons",
-                brand: "STK Supply",
-                description: "Essential gear for the streets • Fully, buttons, switches, binary, AR9",
-                image: "🔫",
-                rating: 4.9,
-                reviews: 234,
-                inStock: true,
-                featured: true,
-                tags: ["arsenal", "safe", "street", "gear"],
-                subcategory: "safe"
-            },
-            {
-                id: 2,
-                name: "Street Arsenal - Bag",
-                price: 2.00,
-                category: "weapons",
-                brand: "STK Supply",
-                description: "Premium setups • Custom builds • Street ready",
-                image: "🎒",
-                rating: 4.8,
-                reviews: 189,
-                inStock: true,
-                featured: true,
-                tags: ["arsenal", "bag", "storage"],
-                subcategory: "bag"
-            },
-            {
-                id: 3,
-                name: "Street Arsenal - Trunk",
-                price: 1.00,
-                category: "weapons",
-                brand: "STK Supply",
-                description: "Pick from dropdown below • Select storage type for your weapon",
-                image: "📦",
-                rating: 4.7,
-                reviews: 156,
-                inStock: true,
-                featured: false,
-                tags: ["arsenal", "trunk", "storage"],
-                subcategory: "trunk"
-            },
-            // Money
-            {
-                id: 4,
-                name: "Max Money 990k",
-                price: 1.00,
-                category: "money",
-                brand: "STK Supply",
-                description: "Clean money packages • Regular & Gamepass options",
-                image: "💰",
-                rating: 4.9,
-                reviews: 567,
-                inStock: true,
-                featured: true,
-                tags: ["money", "package", "regular"],
-                subcategory: "regular"
-            },
-            {
-                id: 5,
-                name: "Max Bank 990k",
-                price: 1.00,
-                category: "money",
-                brand: "STK Supply",
-                description: "Max out your cash • Clean money packages",
-                image: "🏦",
-                rating: 4.8,
-                reviews: 432,
-                inStock: true,
-                featured: true,
-                tags: ["money", "bank", "regular"],
-                subcategory: "regular"
-            },
-            {
-                id: 6,
-                name: "Max Money 1.6M (Gamepass)",
-                price: 2.00,
-                category: "money",
-                brand: "STK Supply",
-                description: "Gamepass exclusive • Higher limits available",
-                image: "💎",
-                rating: 4.9,
-                reviews: 321,
-                inStock: true,
-                featured: true,
-                tags: ["money", "gamepass", "premium"],
-                subcategory: "gamepass"
-            },
-            {
-                id: 7,
-                name: "Max Bank 1.6M (Gamepass)",
-                price: 2.00,
-                category: "money",
-                brand: "STK Supply",
-                description: "Gamepass bank package • Premium service",
-                image: "💳",
-                rating: 4.8,
-                reviews: 289,
-                inStock: true,
-                featured: true,
-                tags: ["money", "gamepass", "bank"],
-                subcategory: "gamepass"
-            },
-            // Watches
-            {
-                id: 8,
-                name: "Luxury Watch Collection",
-                price: 1.00,
-                category: "watches",
-                brand: "STK Supply",
-                description: "High-end connections • Watches & Scripts • Designer pieces • Custom codes",
-                image: "⌚",
-                rating: 4.9,
-                reviews: 178,
-                inStock: true,
-                featured: true,
-                tags: ["luxury", "watches", "designer"],
-                subcategory: "luxury"
-            },
-            // Scripts
-            {
-                id: 9,
-                name: "Custom Scripts Collection",
-                price: 0.00,
-                category: "scripts",
-                brand: "STK Supply",
-                description: "Coming Soon • Advanced automation scripts • Custom development",
-                image: "💻",
-                rating: 0,
-                reviews: 0,
-                inStock: false,
-                featured: false,
-                tags: ["scripts", "automation", "custom"],
-                subcategory: "coming-soon"
-            },
-            ];
+            // Package Options for Weapons
+            { id: 1, name: "Safe Package", price: 3.00, category: "weapons", subcategory: "safe", description: "Premium safe storage for your weapon", image: "🔒", rating: 4.9, reviews: 1234, inStock: true, featured: true },
+            { id: 2, name: "Bag Package", price: 2.00, category: "weapons", subcategory: "bag", description: "Premium bag storage for your weapon", image: "🎒", rating: 4.8, reviews: 987, inStock: true, featured: true },
+            { id: 3, name: "Trunk Package", price: 1.00, category: "weapons", subcategory: "trunk", description: "Basic trunk storage for your weapon", image: "📦", rating: 4.7, reviews: 756, inStock: true, featured: true },
+
+            // Money - Regular ($1 each)
+            { id: 49, name: "Max Money 990k", price: 1.00, category: "money", subcategory: "regular", description: "Clean money package • Regular option", image: "💰", rating: 4.9, reviews: 567, inStock: true, featured: true },
+            { id: 50, name: "Max Bank 990k", price: 1.00, category: "money", subcategory: "regular", description: "Max out your bank • Regular option", image: "🏦", rating: 4.8, reviews: 432, inStock: true, featured: true },
+
+            // Money - Gamepass ($2 each)
+            { id: 51, name: "Max Money 1.6M (Extra Money Pass)", price: 2.00, category: "money", subcategory: "gamepass", description: "Extra Money Pass exclusive • Higher limits", image: "💎", rating: 4.9, reviews: 321, inStock: true, featured: true },
+            { id: 52, name: "Max Bank 1.6M (Extra Bank Pass)", price: 2.00, category: "money", subcategory: "gamepass", description: "Extra Bank Pass exclusive • Higher limits", image: "💳", rating: 4.8, reviews: 289, inStock: true, featured: true },
+
+            // Watches ($1 each)
+            { id: 53, name: "Cartier", price: 1.00, category: "watches", subcategory: "luxury", description: "Luxury Cartier watch", image: "⌚", rating: 4.9, reviews: 178, inStock: true, featured: true },
+            { id: 54, name: "BlueFaceCartier", price: 1.00, category: "watches", subcategory: "luxury", description: "Blue Face Cartier watch", image: "⌚", rating: 4.8, reviews: 156, inStock: true, featured: true },
+            { id: 55, name: "White Richard Millie", price: 1.00, category: "watches", subcategory: "luxury", description: "White Richard Mille watch", image: "⌚", rating: 4.9, reviews: 234, inStock: true, featured: true },
+            { id: 56, name: "PinkRichard", price: 1.00, category: "watches", subcategory: "luxury", description: "Pink Richard Mille watch", image: "⌚", rating: 4.8, reviews: 189, inStock: true, featured: true },
+            { id: 57, name: "GreenRichard", price: 1.00, category: "watches", subcategory: "luxury", description: "Green Richard Mille watch", image: "⌚", rating: 4.7, reviews: 167, inStock: true, featured: false },
+            { id: 58, name: "RedRichard", price: 1.00, category: "watches", subcategory: "luxury", description: "Red Richard Mille watch", image: "⌚", rating: 4.8, reviews: 145, inStock: true, featured: true },
+            { id: 59, name: "BluRichard", price: 1.00, category: "watches", subcategory: "luxury", description: "Blue Richard Mille watch", image: "⌚", rating: 4.9, reviews: 198, inStock: true, featured: true },
+            { id: 60, name: "BlackOutMillie", price: 1.00, category: "watches", subcategory: "luxury", description: "BlackOut Mille watch", image: "⌚", rating: 4.8, reviews: 176, inStock: true, featured: true },
+            { id: 61, name: "Red AP", price: 1.00, category: "watches", subcategory: "luxury", description: "Red Audemars Piguet", image: "⌚", rating: 4.7, reviews: 134, inStock: true, featured: false },
+            { id: 62, name: "AP Watch", price: 1.00, category: "watches", subcategory: "luxury", description: "Classic Audemars Piguet", image: "⌚", rating: 4.9, reviews: 210, inStock: true, featured: true },
+            { id: 63, name: "Gold AP", price: 1.00, category: "watches", subcategory: "luxury", description: "Gold Audemars Piguet", image: "⌚", rating: 4.8, reviews: 187, inStock: true, featured: true },
+            { id: 64, name: "Red AP Watch", price: 1.00, category: "watches", subcategory: "luxury", description: "Red AP Watch variant", image: "⌚", rating: 4.7, reviews: 156, inStock: true, featured: false },
+            { id: 65, name: "CubanG AP", price: 1.00, category: "watches", subcategory: "luxury", description: "Cuban Gold AP", image: "⌚", rating: 4.8, reviews: 178, inStock: true, featured: true },
+            { id: 66, name: "CubanP AP", price: 1.00, category: "watches", subcategory: "luxury", description: "Cuban Pink AP", image: "⌚", rating: 4.7, reviews: 145, inStock: true, featured: false },
+            { id: 67, name: "CubanB AP", price: 1.00, category: "watches", subcategory: "luxury", description: "Cuban Blue AP", image: "⌚", rating: 4.8, reviews: 167, inStock: true, featured: true },
+            { id: 68, name: "Iced AP", price: 1.00, category: "watches", subcategory: "luxury", description: "Iced out Audemars Piguet", image: "⌚", rating: 4.9, reviews: 234, inStock: true, featured: true }
+        ];
         
         this.filteredProducts = [...this.products];
     }
@@ -190,9 +91,14 @@ class ShopManager {
                 
                 // Update filter
                 this.filters.category = category;
+                this.filters.subcategory = 'all'; // Reset subcategory when changing main category
                 this.applyFilters();
+                this.renderSubcategoryTabs();
             });
         });
+
+        // Subcategory tabs
+        this.bindSubcategoryEvents();
         
         // Price range
         const priceRange = document.getElementById('priceRange');
@@ -217,31 +123,6 @@ class ShopManager {
                 });
             });
         }
-        
-        // Brand filters
-        document.querySelectorAll('input[type="checkbox"][value^="brand"]').forEach(input => {
-            input.addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    this.filters.brands.push(e.target.value);
-                } else {
-                    this.filters.brands = this.filters.brands.filter(brand => brand !== e.target.value);
-                }
-                this.applyFilters();
-            });
-        });
-        
-        // Rating filters
-        document.querySelectorAll('input[type="checkbox"][value^="rating"]').forEach(input => {
-            input.addEventListener('change', (e) => {
-                const rating = parseInt(e.target.value);
-                if (e.target.checked) {
-                    this.filters.ratings.push(rating);
-                } else {
-                    this.filters.ratings = this.filters.ratings.filter(r => r !== rating);
-                }
-                this.applyFilters();
-            });
-        });
         
         // Sort
         const sortSelect = document.getElementById('sortSelect');
@@ -279,18 +160,133 @@ class ShopManager {
                 }
             });
         }
+
+        // Initialize with weapons category
+        this.renderSubcategoryTabs();
+    }
+
+    bindSubcategoryEvents() {
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('subcategory-tab')) {
+                const subcategory = e.target.dataset.subcategory;
+                
+                // Update active tab
+                document.querySelectorAll('.subcategory-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update filter
+                this.filters.subcategory = subcategory;
+                this.applyFilters();
+            }
+            
+            if (e.target.classList.contains('weapon-tab')) {
+                const weapon = e.target.dataset.weapon;
+                
+                // Update active tab
+                document.querySelectorAll('.weapon-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update selected weapon
+                this.selectedWeapon = weapon;
+                this.applyFilters();
+            }
+        });
+    }
+
+    renderSubcategoryTabs() {
+        const subcategoryContainer = document.querySelector('.subcategory-tabs');
+        if (!subcategoryContainer) {
+            // Create subcategory container after category tabs
+            const categorySection = document.querySelector('.filter-section');
+            const subcategorySection = document.createElement('div');
+            subcategorySection.className = 'filter-section';
+            subcategorySection.innerHTML = `
+                <h4>Weapon Selection</h4>
+                <div class="weapon-tabs"></div>
+                <h4 style="margin-top: 24px;">Package Type</h4>
+                <div class="subcategory-tabs"></div>
+            `;
+            categorySection.parentNode.insertBefore(subcategorySection, categorySection.nextSibling);
+        }
+
+        const weaponContainer = document.querySelector('.weapon-tabs');
+        const container = document.querySelector('.subcategory-tabs');
+        if (!container) return;
+
+        if (this.filters.category === 'weapons') {
+            // Render weapon selection tabs
+            if (weaponContainer) {
+                weaponContainer.innerHTML = this.weapons.map(weapon => `
+                    <button class="weapon-tab ${this.selectedWeapon === weapon ? 'active' : ''}" 
+                            data-weapon="${weapon}">
+                        <i>🔫</i>
+                        <span>${weapon}</span>
+                    </button>
+                `).join('');
+            }
+
+            // Render package type tabs
+            const subcategories = [
+                { id: 'safe', name: 'Safe ($3)', icon: '🔒' },
+                { id: 'bag', name: 'Bag ($2)', icon: '🎒' },
+                { id: 'trunk', name: 'Trunk ($1)', icon: '📦' }
+            ];
+
+            container.innerHTML = subcategories.map(sub => `
+                <button class="subcategory-tab ${this.filters.subcategory === sub.id ? 'active' : ''}" 
+                        data-subcategory="${sub.id}">
+                    <i>${sub.icon}</i>
+                    <span>${sub.name}</span>
+                </button>
+            `).join('');
+        } else if (this.filters.category === 'money') {
+            // Hide weapon tabs for money category
+            if (weaponContainer) weaponContainer.innerHTML = '';
+            
+            const subcategories = [
+                { id: 'all', name: 'All Options', icon: '💰' },
+                { id: 'regular', name: 'Regular ($1)', icon: '💵' },
+                { id: 'gamepass', name: 'Gamepass ($2)', icon: '💎' }
+            ];
+
+            container.innerHTML = subcategories.map(sub => `
+                <button class="subcategory-tab ${this.filters.subcategory === sub.id ? 'active' : ''}" 
+                        data-subcategory="${sub.id}">
+                    <i>${sub.icon}</i>
+                    <span>${sub.name}</span>
+                </button>
+            `).join('');
+        } else if (this.filters.category === 'watches') {
+            // Hide weapon tabs for watches category
+            if (weaponContainer) weaponContainer.innerHTML = '';
+            
+            const subcategories = [
+                { id: 'all', name: 'All Watches', icon: '⌚' },
+                { id: 'luxury', name: 'Luxury ($1)', icon: '💎' }
+            ];
+
+            container.innerHTML = subcategories.map(sub => `
+                <button class="subcategory-tab ${this.filters.subcategory === sub.id ? 'active' : ''}" 
+                        data-subcategory="${sub.id}">
+                    <i>${sub.icon}</i>
+                    <span>${sub.name}</span>
+                </button>
+            `).join('');
+        }
     }
     
     handleURLParams() {
         const urlParams = new URLSearchParams(window.location.search);
         const category = urlParams.get('category');
         
-        if (category && category !== 'all') {
+        if (category && ['weapons', 'money', 'watches'].includes(category)) {
             this.filters.category = category;
-            const categoryInput = document.querySelector(`input[name="category"][value="${category}"]`);
-            if (categoryInput) {
-                categoryInput.checked = true;
+            const categoryTab = document.querySelector(`[data-category="${category}"]`);
+            if (categoryTab) {
+                document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+                categoryTab.classList.add('active');
             }
+            this.renderSubcategoryTabs();
             this.applyFilters();
         }
     }
@@ -299,6 +295,11 @@ class ShopManager {
         this.filteredProducts = this.products.filter(product => {
             // Category filter
             if (this.filters.category && product.category !== this.filters.category) {
+                return false;
+            }
+            
+            // Subcategory filter
+            if (this.filters.subcategory && this.filters.subcategory !== 'all' && product.subcategory !== this.filters.subcategory) {
                 return false;
             }
             
@@ -315,27 +316,11 @@ class ShopManager {
                 return false;
             }
             
-            // Brand filter
-            if (this.filters.brands.length > 0 && !this.filters.brands.includes(product.brand)) {
-                return false;
-            }
-            
-            // Rating filter
-            if (this.filters.ratings.length > 0) {
-                const hasMatchingRating = this.filters.ratings.some(rating => {
-                    if (rating === 5) return product.rating >= 4.5;
-                    if (rating === 4) return product.rating >= 4.0;
-                    return product.rating >= rating;
-                });
-                if (!hasMatchingRating) return false;
-            }
-            
             // Search filter
             if (this.filters.search) {
                 const searchTerm = this.filters.search.toLowerCase();
                 return product.name.toLowerCase().includes(searchTerm) ||
-                       product.description.toLowerCase().includes(searchTerm) ||
-                       product.tags.some(tag => tag.includes(searchTerm));
+                       product.description.toLowerCase().includes(searchTerm);
             }
             
             return true;
@@ -344,7 +329,6 @@ class ShopManager {
         this.currentPage = 1;
         this.sortProducts();
         this.renderProducts();
-        this.updateFilterCounts();
     }
     
     sortProducts() {
@@ -413,29 +397,68 @@ class ShopManager {
             ).join('');
             
             this.renderPagination();
-        }, 300);
+        }, 100);
     }
     
     createProductCard(product) {
-        const discountPercentage = product.originalPrice ? 
-            Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) : 0;
+        if (this.filters.category === 'weapons') {
+            const weaponName = this.selectedWeapon || 'Select a weapon';
+            const isDisabled = !this.selectedWeapon;
+            
+            return `
+                <div class="product-card ${isDisabled ? 'disabled' : ''}" data-product-id="${product.id}">
+                    <div class="product-image">
+                        ${product.image}
+                        <div class="product-actions">
+                            <button class="action-btn" onclick="shopManager.quickView(${product.id})" title="Quick View">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="product-info">
+                        <div class="product-category">Weapon Package</div>
+                        <h3 class="product-title">${weaponName} + ${product.name}</h3>
+                        <div class="package-details">
+                            <div class="weapon-info">🔫 ${weaponName} (FREE)</div>
+                            <div class="package-info">${product.image} ${product.name}</div>
+                        </div>
+                        <div class="product-rating">
+                            <div class="stars">
+                                ${this.renderStars(product.rating)}
+                            </div>
+                            <span class="rating-count">(${product.reviews})</span>
+                        </div>
+                        <div class="product-price">
+                            $${product.price.toFixed(2)}
+                            <small>Package only</small>
+                        </div>
+                        ${product.inStock && !isDisabled ? 
+                            `<button class="add-to-cart" onclick="shopManager.addToCart(${product.id})">
+                                <i class="fas fa-shopping-cart"></i>
+                                Add to Cart
+                            </button>` :
+                            `<button class="add-to-cart coming-soon" disabled>
+                                <i class="fas fa-${isDisabled ? 'exclamation-triangle' : 'clock'}"></i>
+                                ${isDisabled ? 'Select Weapon First' : 'Coming Soon'}
+                            </button>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
         
         return `
             <div class="product-card" data-product-id="${product.id}">
                 <div class="product-image">
                     ${product.image}
-                    ${discountPercentage > 0 ? `<div class="discount-badge">-${discountPercentage}%</div>` : ''}
                     <div class="product-actions">
-                        <button class="action-btn" onclick="shopManager.toggleWishlist(${product.id})" title="Add to Wishlist">
-                            <i class="far fa-heart"></i>
-                        </button>
                         <button class="action-btn" onclick="shopManager.quickView(${product.id})" title="Quick View">
                             <i class="fas fa-eye"></i>
                         </button>
                     </div>
                 </div>
                 <div class="product-info">
-                    <div class="product-category">${product.category}</div>
+                    <div class="product-category">${product.category} • ${product.subcategory}</div>
                     <h3 class="product-title">${product.name}</h3>
                     <div class="product-rating">
                         <div class="stars">
@@ -445,7 +468,6 @@ class ShopManager {
                     </div>
                     <div class="product-price">
                         $${product.price.toFixed(2)}
-                        ${product.originalPrice ? `<span class="original-price">$${product.originalPrice.toFixed(2)}</span>` : ''}
                     </div>
                     ${product.inStock ? 
                         `<button class="add-to-cart" onclick="shopManager.addToCart(${product.id})">
@@ -526,35 +548,33 @@ class ShopManager {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     
-    updateFilterCounts() {
-        // Update category counts
-        const categories = ['all', 'electronics', 'clothing', 'home', 'sports', 'books'];
-        categories.forEach(category => {
-            const countElement = document.getElementById(`${category}Count`);
-            if (countElement) {
-                const count = category === 'all' ? 
-                    this.products.length : 
-                    this.products.filter(p => p.category === category).length;
-                countElement.textContent = count;
-            }
-        });
-    }
-    
-    updateFilters() {
-        this.updateFilterCounts();
-    }
-    
     // Cart Management
     addToCart(productId) {
         const product = this.products.find(p => p.id === productId);
         if (!product) return;
         
-        const existingItem = this.cart.find(item => item.id === productId);
+        // For weapons, require weapon selection
+        if (this.filters.category === 'weapons' && !this.selectedWeapon) {
+            this.showNotification('Please select a weapon first!', 'error');
+            return;
+        }
+        
+        let cartItem = { ...product, quantity: 1 };
+        
+        // Add weapon info for weapon packages
+        if (this.filters.category === 'weapons' && this.selectedWeapon) {
+            cartItem.weaponName = this.selectedWeapon;
+            cartItem.name = `${this.selectedWeapon} + ${product.name}`;
+            cartItem.uniqueId = `${productId}-${this.selectedWeapon}`;
+        }
+        
+        const uniqueId = cartItem.uniqueId || productId;
+        const existingItem = this.cart.find(item => (item.uniqueId || item.id) === uniqueId);
         
         if (existingItem) {
             existingItem.quantity += 1;
         } else {
-            this.cart.push({ ...product, quantity: 1 });
+            this.cart.push(cartItem);
         }
         
         this.updateCartUI();
@@ -562,20 +582,20 @@ class ShopManager {
         this.showNotification('Item added to cart!', 'success');
     }
     
-    removeFromCart(productId) {
-        this.cart = this.cart.filter(item => item.id !== productId);
+    removeFromCart(uniqueId) {
+        this.cart = this.cart.filter(item => (item.uniqueId || item.id) !== uniqueId);
         this.updateCartUI();
         this.saveCartToStorage();
     }
     
-    updateQuantity(productId, change) {
-        const item = this.cart.find(item => item.id === productId);
+    updateQuantity(uniqueId, change) {
+        const item = this.cart.find(item => (item.uniqueId || item.id) === uniqueId);
         if (!item) return;
         
         item.quantity += change;
         
         if (item.quantity <= 0) {
-            this.removeFromCart(productId);
+            this.removeFromCart(uniqueId);
         } else {
             this.updateCartUI();
             this.saveCartToStorage();
@@ -607,43 +627,47 @@ class ShopManager {
                     </div>
                 `;
             } else {
-                cartContent.innerHTML = this.cart.map(item => `
-                    <div class="cart-item">
-                        <div class="cart-item-image">${item.image}</div>
-                        <div class="cart-item-info">
-                            <div class="cart-item-name">${item.name}</div>
-                            <div class="cart-item-price">$${item.price.toFixed(2)}</div>
-                            <div class="quantity-controls">
-                                <button class="quantity-btn" onclick="shopManager.updateQuantity(${item.id}, -1)">-</button>
-                                <span class="quantity">${item.quantity}</span>
-                                <button class="quantity-btn" onclick="shopManager.updateQuantity(${item.id}, 1)">+</button>
+                cartContent.innerHTML = this.cart.map(item => {
+                    const uniqueId = item.uniqueId || item.id;
+                    return `
+                        <div class="cart-item">
+                            <div class="cart-item-image">${item.image}</div>
+                            <div class="cart-item-info">
+                                <div class="cart-item-name">${item.name}</div>
+                                ${item.weaponName ? `<div class="cart-item-weapon">🔫 ${item.weaponName} (Free)</div>` : ''}
+                                <div class="cart-item-price">$${item.price.toFixed(2)}</div>
+                                <div class="quantity-controls">
+                                    <button class="quantity-btn" onclick="shopManager.updateQuantity('${uniqueId}', -1)">-</button>
+                                    <span class="quantity">${item.quantity}</span>
+                                    <button class="quantity-btn" onclick="shopManager.updateQuantity('${uniqueId}', 1)">+</button>
+                                </div>
                             </div>
+                            <button class="remove-item" onclick="shopManager.removeFromCart('${uniqueId}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
-                        <button class="remove-item" onclick="shopManager.removeFromCart(${item.id})">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             }
         }
         
         // Update totals
         const subtotal = this.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const shipping = subtotal >= 50 ? 0 : 9.99;
+        const shipping = 0; // Free shipping for digital products
         const total = subtotal + shipping;
         
         if (cartSubtotal) cartSubtotal.textContent = `$${subtotal.toFixed(2)}`;
-        if (cartShipping) cartShipping.textContent = shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`;
+        if (cartShipping) cartShipping.textContent = 'Free';
         if (cartTotal) cartTotal.textContent = `$${total.toFixed(2)}`;
     }
     
     // Storage
     saveCartToStorage() {
-        localStorage.setItem('cart', JSON.stringify(this.cart));
+        localStorage.setItem('stkCart', JSON.stringify(this.cart));
     }
     
     loadCartFromStorage() {
-        const savedCart = localStorage.getItem('cart');
+        const savedCart = localStorage.getItem('stkCart');
         if (savedCart) {
             this.cart = JSON.parse(savedCart);
         }
@@ -660,7 +684,7 @@ class ShopManager {
         const suggestions = this.products
             .filter(product => 
                 product.name.toLowerCase().includes(query.toLowerCase()) ||
-                product.tags.some(tag => tag.includes(query.toLowerCase()))
+                product.description.toLowerCase().includes(query.toLowerCase())
             )
             .slice(0, 5);
         
@@ -711,7 +735,7 @@ class ShopManager {
                         </div>
                     </div>
                     <div class="quick-view-details">
-                        <div class="product-category">${product.category}</div>
+                        <div class="product-category">${product.category} • ${product.subcategory}</div>
                         <h2>${product.name}</h2>
                         <div class="product-rating">
                             <div class="stars">${this.renderStars(product.rating)}</div>
@@ -720,16 +744,11 @@ class ShopManager {
                         <p class="product-description">${product.description}</p>
                         <div class="product-price">
                             $${product.price.toFixed(2)}
-                            ${product.originalPrice ? `<span class="original-price">$${product.originalPrice.toFixed(2)}</span>` : ''}
                         </div>
-                        <div class="product-actions">
-                            <button class="btn btn-primary" onclick="shopManager.addToCart(${product.id}); shopManager.closeQuickView();">
+                        <div class="product-actions" style="margin-top: 24px;">
+                            <button class="btn btn-primary" onclick="shopManager.addToCart(${product.id}); shopManager.closeQuickView();" style="width: 100%; margin-bottom: 12px;">
                                 <i class="fas fa-shopping-cart"></i>
-                                Add to Cart
-                            </button>
-                            <button class="btn btn-secondary" onclick="shopManager.toggleWishlist(${product.id})">
-                                <i class="far fa-heart"></i>
-                                Add to Wishlist
+                                Add to Cart - $${product.price.toFixed(2)}
                             </button>
                         </div>
                     </div>
@@ -748,14 +767,11 @@ class ShopManager {
     }
     
     // Utility Methods
-    toggleWishlist(productId) {
-        this.showNotification('Wishlist feature coming soon!', 'info');
-    }
-    
     clearAllFilters() {
         // Reset all filters
         this.filters = {
-            category: 'all',
+            category: 'weapons',
+            subcategory: 'all',
             priceRange: 1000,
             brands: [],
             ratings: [],
@@ -763,13 +779,14 @@ class ShopManager {
         };
         
         // Reset UI
-        document.querySelector('input[name="category"][value="all"]').checked = true;
+        document.querySelector('[data-category="weapons"]').click();
         document.getElementById('priceRange').value = 1000;
         document.getElementById('priceValue').textContent = '1000';
         document.getElementById('minPrice').value = '';
         document.getElementById('maxPrice').value = '';
         document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
         
+        this.renderSubcategoryTabs();
         this.applyFilters();
     }
     
@@ -820,18 +837,18 @@ class ShopManager {
         const total = this.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const itemCount = this.cart.reduce((sum, item) => sum + item.quantity, 0);
         
-        // Simulate checkout process
-        this.showNotification('Redirecting to checkout...', 'info');
+        // Show order summary
+        const orderSummary = this.cart.map(item => 
+            `${item.quantity}x ${item.name} - $${(item.price * item.quantity).toFixed(2)}`
+        ).join('\n');
         
-        setTimeout(() => {
-            alert(`Checkout Summary:\n\nItems: ${itemCount}\nTotal: $${total.toFixed(2)}\n\nThank you for your purchase!\n\nNote: This is a demo checkout.`);
-            
-            // Clear cart
-            this.cart = [];
-            this.updateCartUI();
-            this.saveCartToStorage();
-            toggleCart();
-        }, 1000);
+        alert(`STK Supply Order Summary:\n\n${orderSummary}\n\nTotal Items: ${itemCount}\nTotal: $${total.toFixed(2)}\n\nThank you for your order!\n\nNote: This is a demo. Contact STK Supply for actual orders.`);
+        
+        // Clear cart
+        this.cart = [];
+        this.updateCartUI();
+        this.saveCartToStorage();
+        toggleCart();
     }
 }
 
@@ -910,7 +927,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Mobile navigation toggle with body scroll lock
+    // Mobile navigation toggle
     const navToggle = document.querySelector('.nav-toggle');
     const navMenu = document.querySelector('.nav-menu');
     
@@ -920,13 +937,11 @@ document.addEventListener('DOMContentLoaded', function() {
             navMenu.classList.toggle('active');
             navToggle.classList.toggle('active');
             
-            // Lock body scroll on mobile when menu is open
             if (window.innerWidth <= 768) {
                 document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
             }
         });
         
-        // Close mobile menu when clicking nav links
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', () => {
                 if (window.innerWidth <= 768) {
@@ -937,7 +952,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
         
-        // Close mobile menu on window resize
         window.addEventListener('resize', () => {
             if (window.innerWidth > 768) {
                 navMenu.classList.remove('active');
@@ -946,63 +960,4 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // Mobile-specific optimizations
-    if (window.innerWidth <= 768) {
-        // Reduce animations on mobile for better performance
-        document.documentElement.style.setProperty('--animation-duration', '0.2s');
-        
-        // Add touch feedback for product cards
-        document.addEventListener('touchstart', function(e) {
-            if (e.target.closest('.product-card')) {
-                e.target.closest('.product-card').style.transform = 'scale(0.98)';
-            }
-        });
-        
-        document.addEventListener('touchend', function(e) {
-            if (e.target.closest('.product-card')) {
-                setTimeout(() => {
-                    e.target.closest('.product-card').style.transform = '';
-                }, 150);
-            }
-        });
-    }
-    
-    // Handle orientation change
-    window.addEventListener('orientationchange', function() {
-        setTimeout(() => {
-            // Recalculate viewport dimensions
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-            
-            // Close any open overlays on orientation change
-            const searchOverlay = document.getElementById('searchOverlay');
-            const cartSidebar = document.getElementById('cartSidebar');
-            const shopSidebar = document.getElementById('shopSidebar');
-            
-            if (searchOverlay && searchOverlay.style.display === 'flex') {
-                toggleSearch();
-            }
-            if (cartSidebar && cartSidebar.classList.contains('active')) {
-                toggleCart();
-            }
-            if (shopSidebar && shopSidebar.classList.contains('active')) {
-                toggleSidebar();
-            }
-        }, 100);
-    });
-    
-    // Optimize scroll performance on mobile
-    let ticking = false;
-    function updateScrollPosition() {
-        // Add any scroll-based animations here
-        ticking = false;
-    }
-    
-    window.addEventListener('scroll', function() {
-        if (!ticking) {
-            requestAnimationFrame(updateScrollPosition);
-            ticking = true;
-        }
-    }, { passive: true });
 });
