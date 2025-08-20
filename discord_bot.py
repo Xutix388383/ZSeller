@@ -4,6 +4,8 @@ import json
 import os
 from datetime import datetime
 import asyncio
+import aiohttp
+import re
 
 # Bot setup
 intents = discord.Intents.default()
@@ -20,26 +22,30 @@ def get_channels_by_name(guild):
     if not guild:
         return channels
 
-    # Define channel name patterns to look for
+    # Define channel name patterns to look for (more flexible matching)
     channel_patterns = {
-        'support': ['support', 'help', 'ticket', 'assistance'],
-        'stk': ['stk', 'gang', 'recruitment', 'join'],
-        'tos': ['tos', 'terms', 'terms-of-service', 'legal'],
-        'rules': ['rules', 'server-rules', 'guidelines'],
-        'news': ['news', 'announcements', 'updates', 'info'],
-        'welcome': ['welcome', 'general', 'main', 'lobby']
+        'support': ['support', 'help', 'ticket', 'assistance', 'staff', 'admin'],
+        'stk': ['stk', 'gang', 'recruitment', 'join', 'member'],
+        'tos': ['tos', 'terms', 'legal', 'policy'],
+        'rules': ['rules', 'guidelines', 'info'],
+        'news': ['news', 'announcements', 'updates', 'notice'],
+        'welcome': ['welcome', 'general', 'main', 'lobby', 'entrance', 'start']
     }
 
     # Get all text channels in the guild
     for channel in guild.text_channels:
         channel_name_lower = channel.name.lower()
+        # Remove special characters and emojis for better matching
+        clean_name = ''.join(c for c in channel_name_lower if c.isalnum() or c in ['-', '_', ' '])
 
         # Check each pattern category
         for category, patterns in channel_patterns.items():
             for pattern in patterns:
-                if pattern in channel_name_lower:
+                # Check if pattern is in the name or if the name contains the pattern
+                if pattern in clean_name or any(pattern in word for word in clean_name.split()):
                     if category not in channels:  # Only set if not already found
                         channels[category] = channel.id
+                        print(f"  ✅ Detected {category}: #{channel.name}")
                     break
 
     return channels
@@ -47,10 +53,10 @@ def get_channels_by_name(guild):
 # Global variable to store detected channels
 CHANNELS = {}
 
-# Welcome message task
+# Shop reminder task
 @tasks.loop(minutes=15)
-async def send_welcome_message():
-    """Send welcome message every 15 minutes"""
+async def send_shop_reminder():
+    """Send shop reminder every 15 minutes and auto-delete duplicates"""
     try:
         # Use the specific welcome channel ID
         welcome_channel_id = 1407347199477547101
@@ -67,21 +73,49 @@ async def send_welcome_message():
                 if welcome_channel:
                     break
 
-        # Send welcome message if channel found and bot has permissions
+        # Send reminder and handle duplicate deletion
         if welcome_channel and check_channel_permissions(welcome_channel):
-            embed = create_welcome_embed()
+            # Delete old shop reminder messages to prevent spam (limited to prevent rate limiting)
+            try:
+                deleted_count = 0
+                async for message in welcome_channel.history(limit=10):  # Reduced from 50 to 10
+                    if (message.author == bot.user and 
+                        message.embeds and 
+                        len(message.embeds) > 0 and
+                        "Shop Reminder" in str(message.embeds[0].title)):
+                        await message.delete()
+                        deleted_count += 1
+                        print(f"🗑️ Deleted old shop reminder message ({deleted_count})")
+                        
+                        # Add delay to prevent rate limiting
+                        if deleted_count >= 3:  # Stop after 3 deletions to prevent rate limiting
+                            break
+                        await asyncio.sleep(1)  # 1 second delay between deletions
+                        
+            except discord.Forbidden:
+                print("⚠️ No permission to delete old messages")
+            except discord.HTTPException as e:
+                if e.status == 429:  # Rate limited
+                    print("⚠️ Rate limited while deleting messages, skipping cleanup")
+                else:
+                    print(f"⚠️ HTTP error deleting messages: {e}")
+            except Exception as e:
+                print(f"⚠️ Error deleting old messages: {e}")
+
+            # Send new reminder message
+            embed = create_reminder_embed()
             await welcome_channel.send(embed=embed)
-            print(f"✅ Welcome message sent to #{welcome_channel.name}")
+            print(f"✅ Shop reminder sent to #{welcome_channel.name}")
         elif welcome_channel:
-            print(f"❌ No permission to send welcome message in #{welcome_channel.name}")
+            print(f"❌ No permission to send shop reminder in #{welcome_channel.name}")
         else:
             print("⚠️ No welcome channel found. Create a channel with 'welcome', 'general', or 'main' in the name.")
 
     except Exception as e:
-        print(f"Error sending welcome message: {e}")
+        print(f"Error sending shop reminder: {e}")
 
-@send_welcome_message.before_loop
-async def before_welcome_message():
+@send_shop_reminder.before_loop
+async def before_shop_reminder():
     await bot.wait_until_ready()
 
 # Role IDs
@@ -273,13 +307,28 @@ class GangRecruitmentView(discord.ui.View):
 
     @discord.ui.button(label='Join STK Gang', style=discord.ButtonStyle.success, emoji='⚔️', custom_id='gang_join_stk')
     async def join_gang(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
-            title="🎉 Welcome to STK Gang!",
-            description="You're about to join one of the most elite gangs!\n\n**Click the link below to join:**\nhttps://discord.gg/C6agZhmhCA",
-            color=0x7289da
-        )
-        embed.set_footer(text="STK Gang • Elite Members Only")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        try:
+            if interaction.response.is_done():
+                return
+                
+            embed = discord.Embed(
+                title="🎉 Welcome to STK Gang!",
+                description="You're about to join one of the most elite gangs!\n\n**Click the link below to join:**\nhttps://discord.gg/C6agZhmhCA",
+                color=0x7289da
+            )
+            embed.set_footer(text="STK Gang • Elite Members Only")
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+                
+        except discord.NotFound:
+            pass  # Interaction expired, ignore silently
+        except discord.InteractionResponded:
+            pass  # Already responded, ignore
+        except discord.HTTPException as e:
+            if e.status != 404:  # Don't log 404 errors (interaction not found)
+                print(f"⚠️ HTTP error in gang recruitment: {e}")
+        except Exception as e:
+            print(f"⚠️ Error in gang recruitment: {e}")
 
 # Views for existing shop (keeping original functionality)
 class MainShopView(discord.ui.View):
@@ -524,6 +573,30 @@ def create_news_embed():
     return embed
 
 def create_welcome_embed():
+    embed = discord.Embed(
+        title="👋 Welcome to ZSells Community!",
+        description="**Welcome to our amazing community!**\n\nWe're excited to have you here. Get started by exploring our channels and services!",
+        color=0x00ff7f
+    )
+    embed.add_field(
+        name="🎯 Getting Started",
+        value="• Read our **rules** and **guidelines**\n• Check out our **shop** for premium items\n• Join our **STK Gang** for exclusive perks\n• Create a **support ticket** if you need help",
+        inline=False
+    )
+    embed.add_field(
+        name="💎 Community Benefits",
+        value="✅ Premium services\n✅ 24/7 support\n✅ Exclusive deals\n✅ Elite gang access\n✅ Trusted community",
+        inline=True
+    )
+    embed.add_field(
+        name="🚀 Quick Links",
+        value="• **Shop** - Premium products\n• **Support** - Get help instantly\n• **STK Gang** - Join the elite\n• **Rules** - Community guidelines",
+        inline=True
+    )
+    embed.set_footer(text="ZSells Community • Welcome to the family!")
+    return embed
+
+def create_reminder_embed():
     embed = discord.Embed(
         title="🛒 Shop Reminder - ZSells Premium Store!",
         description="**Don't forget to visit our shop channel!**\n\n💰 Amazing deals and premium products are waiting for you in the shop channel!",
@@ -839,10 +912,10 @@ async def on_ready():
     except Exception as e:
         print(f'Failed to sync commands: {e}')
 
-    # Start the welcome message task
-    if not send_welcome_message.is_running():
-        send_welcome_message.start()
-        print("✅ Welcome message task started (every 15 minutes)")
+    # Start the shop reminder task
+    if not send_shop_reminder.is_running():
+        send_shop_reminder.start()
+        print("✅ Shop reminder task started (every 15 minutes)")
 
     print(f'{bot.user} has connected to Discord!')
     print('Bot is ready with all systems!')
@@ -945,47 +1018,73 @@ async def auto_setup_all_embeds():
     except Exception as e:
         print(f"Error in auto-setup: {e}")
 
-# Advanced AI Embed Creator Modal
-class AIEmbedModal(discord.ui.Modal, title='🤖 Advanced AI Embed Creator'):
+# Simple Embed Creator Modal
+class EmbedCreatorModal(discord.ui.Modal, title='Simple Embed Creator'):
     def __init__(self, target_channel):
         super().__init__()
         self.target_channel = target_channel
 
-    embed_prompt = discord.ui.TextInput(
-        label='🎯 AI Prompt - Describe what you want to create',
-        placeholder='E.g., "Create a gaming tournament announcement with prizes, rules, and registration info in red theme with emojis"',
+    embed_title = discord.ui.TextInput(
+        label='Title',
+        placeholder='Enter embed title (required)',
+        style=discord.TextStyle.short,
+        max_length=256,
+        required=True
+    )
+
+    embed_description = discord.ui.TextInput(
+        label='Description',
+        placeholder='Enter embed description...',
+        style=discord.TextStyle.paragraph,
+        max_length=2000,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            if not check_channel_permissions(self.target_channel):
+                await interaction.response.send_message(
+                    f"❌ Bot lacks permission to send messages in {self.target_channel.mention}", 
+                    ephemeral=True
+                )
+                return
+            
+            # Create simple embed
+            embed = discord.Embed(
+                title=self.embed_title.value,
+                description=self.embed_description.value or None,
+                color=0x7289da,
+                timestamp=datetime.now()
+            )
+            
+            embed.set_footer(text="ZSells Embed Creator")
+            
+            await self.target_channel.send(embed=embed)
+            await interaction.response.send_message(
+                f"✅ Embed sent to {self.target_channel.mention}!", 
+                ephemeral=True
+            )
+            
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
+# Message Creator Modal
+class MessageCreatorModal(discord.ui.Modal, title='Message Creator'):
+    def __init__(self, target_channel):
+        super().__init__()
+        self.target_channel = target_channel
+
+    message_content = discord.ui.TextInput(
+        label='Message Content',
+        placeholder='Enter your message content...',
         style=discord.TextStyle.paragraph,
         max_length=2000,
         required=True
     )
 
-    embed_style = discord.ui.TextInput(
-        label='🎨 Style & Theme (optional)',
-        placeholder='E.g., "professional, gaming, fun, serious, colorful, minimalist"',
-        style=discord.TextStyle.short,
-        max_length=100,
-        required=False
-    )
-
-    custom_fields = discord.ui.TextInput(
-        label='📝 Custom Fields (optional)',
-        placeholder='Format: "Field1:Value1|Field2:Value2" - AI will add relevant fields if empty',
-        style=discord.TextStyle.paragraph,
-        max_length=500,
-        required=False
-    )
-
-    embed_color = discord.ui.TextInput(
-        label='🌈 Color (optional)',
-        placeholder='E.g., #ff0000, red, blue, gold, random - AI will choose if empty',
-        style=discord.TextStyle.short,
-        max_length=20,
-        required=False
-    )
-
-    footer_text = discord.ui.TextInput(
-        label='👤 Footer Text (optional)',
-        placeholder='Custom footer text - AI will generate if empty',
+    ping_role = discord.ui.TextInput(
+        label='Ping Role (optional)',
+        placeholder='Role name or ID to ping',
         style=discord.TextStyle.short,
         max_length=100,
         required=False
@@ -993,26 +1092,35 @@ class AIEmbedModal(discord.ui.Modal, title='🤖 Advanced AI Embed Creator'):
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            # Generate advanced AI embed
-            ai_embed = generate_advanced_ai_embed(
-                prompt=self.embed_prompt.value,
-                style=self.embed_style.value or None,
-                custom_fields=self.custom_fields.value or None,
-                color=self.embed_color.value or None,
-                footer=self.footer_text.value or None,
-                channel=self.target_channel
+            if not check_channel_permissions(self.target_channel):
+                await interaction.response.send_message(
+                    f"❌ Bot lacks permission to send messages in {self.target_channel.mention}", 
+                    ephemeral=True
+                )
+                return
+            
+            message_text = self.message_content.value
+            
+            # Handle role ping if provided
+            if self.ping_role.value:
+                guild = self.target_channel.guild
+                role = None
+                if self.ping_role.value.isdigit():
+                    role = guild.get_role(int(self.ping_role.value))
+                else:
+                    role = discord.utils.get(guild.roles, name=self.ping_role.value)
+                
+                if role:
+                    message_text = f"{role.mention}\n{message_text}"
+            
+            await self.target_channel.send(message_text)
+            await interaction.response.send_message(
+                f"✅ Message sent to {self.target_channel.mention}!", 
+                ephemeral=True
             )
             
-            await self.target_channel.send(embed=ai_embed)
-            await interaction.response.send_message(
-                f"🤖 **AI Magic Complete!** ✨\nAdvanced embed generated and sent to {self.target_channel.mention}!\n\n*AI analyzed your prompt and created a custom embed with intelligent formatting.*", 
-                ephemeral=True
-            )
         except Exception as e:
-            await interaction.response.send_message(
-                f"❌ **AI Error:** {str(e)}\n\n*Try simplifying your prompt or check your formatting.*", 
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
 # Bulk Actions Modal
 class BulkMessageModal(discord.ui.Modal, title='Bulk Message Management'):
@@ -1117,7 +1225,7 @@ class AnnouncementModal(discord.ui.Modal, title='Create Announcement'):
 # Enhanced Admin Panel Classes
 class ChannelSelectView(discord.ui.View):
     def __init__(self, guild):
-        super().__init__(timeout=300)
+        super().__init__(timeout=600)  # Extended timeout to 10 minutes
         self.guild = guild
         self.add_channel_select()
 
@@ -1174,61 +1282,68 @@ class ChannelSelectView(discord.ui.View):
         self.add_item(select)
 
     async def channel_select(self, interaction: discord.Interaction):
-        # Check if user is authorized
-        if interaction.user.id != AUTHORIZED_USER_ID:
-            await interaction.response.send_message("❌ You are not authorized to use this dropdown.", ephemeral=True)
-            return
+        try:
+            # Check if interaction is still valid
+            if interaction.response.is_done():
+                return
 
-        selected_value = interaction.data['values'][0]
+            # Check if user is authorized
+            if interaction.user.id != AUTHORIZED_USER_ID:
+                try:
+                    await interaction.response.send_message("❌ You are not authorized to use this dropdown.", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
 
-        # Get the target channel
-        if selected_value == "current":
-            target_channel = interaction.channel
-        elif selected_value == "none":
-            await interaction.response.send_message("❌ No channels available!", ephemeral=True)
-            return
-        elif selected_value.startswith("other_"):
-            channel_id = int(selected_value.replace("other_", ""))
-            target_channel = bot.get_channel(channel_id)
-        else:
-            target_channel = bot.get_channel(CHANNELS.get(selected_value))
+            selected_value = interaction.data['values'][0]
 
-        if not target_channel:
-            await interaction.response.send_message("❌ Selected channel not found!", ephemeral=True)
-            return
+            # Get the target channel
+            if selected_value == "current":
+                target_channel = interaction.channel
+            elif selected_value == "none":
+                try:
+                    await interaction.response.send_message("❌ No channels available!", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+            elif selected_value.startswith("other_"):
+                channel_id = int(selected_value.replace("other_", ""))
+                target_channel = bot.get_channel(channel_id)
+            else:
+                target_channel = bot.get_channel(CHANNELS.get(selected_value))
 
-        # Show the enhanced admin control panel
-        embed = create_admin_control_embed(target_channel)
-        view = AdminControlView(target_channel)
-        await interaction.response.edit_message(embed=embed, view=view)
+            if not target_channel:
+                try:
+                    await interaction.response.send_message("❌ Selected channel not found!", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+
+            # Show the enhanced admin control panel
+            embed = create_admin_control_embed(target_channel)
+            view = AdminControlView(target_channel)
+            try:
+                await interaction.response.edit_message(embed=embed, view=view)
+            except discord.InteractionResponded:
+                await interaction.edit_original_response(embed=embed, view=view)
+        except discord.NotFound:
+            print("⚠️ Channel select interaction expired")
+        except discord.InteractionResponded:
+            print("⚠️ Interaction already responded to")
+        except Exception as e:
+            print(f"⚠️ Error in channel select: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred. Please try again.", ephemeral=True)
+            except:
+                pass
 
 class AdminControlView(discord.ui.View):
     def __init__(self, target_channel):
-        super().__init__(timeout=300)
+        super().__init__(timeout=600)
         self.target_channel = target_channel
 
-    @discord.ui.button(label='AI Embed Creator', style=discord.ButtonStyle.primary, emoji='🤖')
-    async def ai_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        await interaction.response.send_modal(AIEmbedModal(self.target_channel))
-
-    @discord.ui.button(label='Announcement', style=discord.ButtonStyle.success, emoji='📢')
-    async def announcement(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        await interaction.response.send_modal(AnnouncementModal(self.target_channel))
-
-    @discord.ui.button(label='Bulk Delete', style=discord.ButtonStyle.danger, emoji='🗑️')
-    async def bulk_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        await interaction.response.send_modal(BulkMessageModal(self.target_channel, "delete"))
-
-    @discord.ui.button(label='Support Panel', style=discord.ButtonStyle.secondary, emoji='🎫')
+    @discord.ui.button(label='Support Panel', style=discord.ButtonStyle.secondary, emoji='🎫', row=0)
     async def spawn_support(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_admin_permissions(interaction.user, interaction.guild):
             await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
@@ -1244,7 +1359,7 @@ class AdminControlView(discord.ui.View):
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
-    @discord.ui.button(label='Gang Panel', style=discord.ButtonStyle.secondary, emoji='⚔️')
+    @discord.ui.button(label='Gang Panel', style=discord.ButtonStyle.secondary, emoji='⚔️', row=0)
     async def spawn_gang(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_admin_permissions(interaction.user, interaction.guild):
             await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
@@ -1260,7 +1375,7 @@ class AdminControlView(discord.ui.View):
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
-    @discord.ui.button(label='Shop Panel', style=discord.ButtonStyle.secondary, emoji='🛒', row=1)
+    @discord.ui.button(label='Shop Panel', style=discord.ButtonStyle.secondary, emoji='🛒', row=0)
     async def spawn_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_admin_permissions(interaction.user, interaction.guild):
             await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
@@ -1339,6 +1454,21 @@ class AdminControlView(discord.ui.View):
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
+    @discord.ui.button(label='Shop Reminder', style=discord.ButtonStyle.secondary, emoji='🛒', row=2)
+    async def spawn_reminder(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
+            return
+        if not check_channel_permissions(self.target_channel):
+            await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}.", ephemeral=True)
+            return
+        try:
+            embed = create_reminder_embed()
+            await self.target_channel.send(embed=embed)
+            await interaction.response.send_message(f"✅ Shop reminder spawned in {self.target_channel.mention}!", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
+
     @discord.ui.button(label='Close Panel', style=discord.ButtonStyle.danger, emoji='❌', row=2)
     async def close_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not has_admin_permissions(interaction.user, interaction.guild):
@@ -1347,306 +1477,7 @@ class AdminControlView(discord.ui.View):
         embed = discord.Embed(title="✅ Admin Panel Closed", description="Admin panel has been closed.", color=0x95a5a6)
         await interaction.response.edit_message(embed=embed, view=None)
 
-# Advanced AI Embed Generation System
-def generate_advanced_ai_embed(prompt, style=None, custom_fields=None, color=None, footer=None, channel=None):
-    """Advanced AI embed generator that can create any type of embed"""
-    import random
-    
-    prompt_lower = prompt.lower()
-    
-    # Advanced color processing
-    embed_color = parse_embed_color(color, style, prompt_lower)
-    
-    # AI Title Generation
-    title = generate_ai_title(prompt, prompt_lower)
-    
-    # AI Description Generation
-    description = generate_ai_description(prompt, prompt_lower, style)
-    
-    # Create the embed
-    embed = discord.Embed(
-        title=title,
-        description=description,
-        color=embed_color,
-        timestamp=datetime.now()
-    )
-    
-    # Add AI-generated fields
-    ai_fields = generate_ai_fields(prompt, prompt_lower, custom_fields)
-    for field in ai_fields:
-        embed.add_field(**field)
-    
-    # Set footer
-    if footer:
-        embed.set_footer(text=footer)
-    else:
-        ai_footer = generate_ai_footer(prompt_lower, style)
-        embed.set_footer(text=ai_footer)
-    
-    # Add thumbnail/image if relevant
-    thumbnail_url = get_ai_thumbnail(prompt_lower)
-    if thumbnail_url:
-        embed.set_thumbnail(url=thumbnail_url)
-    
-    return embed
 
-def parse_embed_color(color, style, prompt_lower):
-    """Parse color with AI assistance"""
-    import random
-    
-    # Color map with more options
-    color_map = {
-        'red': 0xff0000, 'green': 0x00ff00, 'blue': 0x0000ff,
-        'yellow': 0xffff00, 'orange': 0xffa500, 'purple': 0x800080,
-        'pink': 0xffc0cb, 'black': 0x000000, 'white': 0xffffff,
-        'gray': 0x808080, 'gold': 0xffd700, 'silver': 0xc0c0c0,
-        'cyan': 0x00ffff, 'magenta': 0xff00ff, 'lime': 0x32cd32,
-        'navy': 0x000080, 'maroon': 0x800000, 'teal': 0x008080,
-        'olive': 0x808000, 'aqua': 0x00ffff, 'fuchsia': 0xff00ff,
-        'crimson': 0xdc143c, 'indigo': 0x4b0082, 'violet': 0xee82ee,
-        'turquoise': 0x40e0d0, 'coral': 0xff7f50, 'salmon': 0xfa8072
-    }
-    
-    if color:
-        color = color.strip().lower()
-        if color == 'random':
-            return random.choice(list(color_map.values()))
-        elif color in color_map:
-            return color_map[color]
-        elif color.startswith('#'):
-            try:
-                return int(color[1:], 16)
-            except ValueError:
-                pass
-    
-    # AI color selection based on context
-    if 'error' in prompt_lower or 'warning' in prompt_lower or 'danger' in prompt_lower:
-        return 0xff0000  # Red
-    elif 'success' in prompt_lower or 'complete' in prompt_lower or 'win' in prompt_lower:
-        return 0x00ff00  # Green
-    elif 'info' in prompt_lower or 'help' in prompt_lower or 'support' in prompt_lower:
-        return 0x00aaff  # Blue
-    elif 'shop' in prompt_lower or 'store' in prompt_lower or 'buy' in prompt_lower:
-        return 0xffd700  # Gold
-    elif 'tournament' in prompt_lower or 'game' in prompt_lower or 'competition' in prompt_lower:
-        return 0xff6600  # Orange
-    elif 'premium' in prompt_lower or 'vip' in prompt_lower or 'elite' in prompt_lower:
-        return 0x9d4edd  # Purple
-    elif 'welcome' in prompt_lower or 'join' in prompt_lower:
-        return 0x00ff7f  # Spring green
-    elif style:
-        if 'professional' in style.lower():
-            return 0x2c3e50  # Dark blue-gray
-        elif 'fun' in style.lower() or 'colorful' in style.lower():
-            return random.choice([0xff69b4, 0x00ced1, 0xff4500, 0x32cd32])
-        elif 'serious' in style.lower():
-            return 0x2f3136  # Discord dark
-    
-    # Default Discord blue
-    return 0x7289da
-
-def generate_ai_title(prompt, prompt_lower):
-    """Generate intelligent titles based on prompt analysis"""
-    
-    # Extract key phrases and context
-    if 'tournament' in prompt_lower:
-        if 'announce' in prompt_lower:
-            return "🏆 Tournament Announcement"
-        else:
-            return "🎮 Gaming Tournament"
-    elif 'giveaway' in prompt_lower:
-        return "🎁 Special Giveaway Event"
-    elif 'update' in prompt_lower or 'patch' in prompt_lower:
-        return "📋 Important Update"
-    elif 'maintenance' in prompt_lower:
-        return "🔧 Maintenance Notice"
-    elif 'event' in prompt_lower:
-        return "🎉 Special Event"
-    elif 'welcome' in prompt_lower:
-        return "👋 Welcome to Our Community!"
-    elif 'rule' in prompt_lower:
-        return "📜 Server Rules & Guidelines"
-    elif 'shop' in prompt_lower or 'store' in prompt_lower:
-        return "🛒 Premium Store"
-    elif 'support' in prompt_lower or 'help' in prompt_lower:
-        return "🎫 Support Center"
-    elif 'recruitment' in prompt_lower or 'hiring' in prompt_lower:
-        return "📢 We're Recruiting!"
-    elif 'sale' in prompt_lower or 'discount' in prompt_lower:
-        return "💰 Special Sale Event"
-    elif 'partnership' in prompt_lower:
-        return "🤝 Partnership Announcement"
-    elif 'bot' in prompt_lower and 'update' in prompt_lower:
-        return "🤖 Bot Update Information"
-    else:
-        # Extract the first few words as potential title
-        words = prompt.split()[:4]
-        return f"📋 {' '.join(words).title()}"
-
-def generate_ai_description(prompt, prompt_lower, style):
-    """Generate intelligent descriptions with context awareness"""
-    
-    # Base description with prompt reference
-    description = f"*Generated with AI from your request*\n\n"
-    
-    # Context-aware content generation
-    if 'tournament' in prompt_lower:
-        description += "🏆 **Tournament Details**\n"
-        if 'prize' in prompt_lower:
-            description += "💰 Amazing prizes await the winners!\n"
-        if 'register' in prompt_lower:
-            description += "📝 Registration is now open for all participants.\n"
-        description += "\n🎮 Join us for an epic gaming experience where skill meets competition!"
-        
-    elif 'giveaway' in prompt_lower:
-        description += "🎁 **Exciting Giveaway Alert!**\n\n"
-        description += "We're giving away amazing prizes to our community members!\n"
-        if 'rule' in prompt_lower:
-            description += "📋 Make sure to follow all the rules to qualify.\n"
-        description += "✨ Good luck to everyone participating!"
-        
-    elif 'welcome' in prompt_lower:
-        description += "🌟 **Welcome to Our Amazing Community!**\n\n"
-        description += "We're thrilled to have you join us! Here's what you need to know:\n"
-        description += "• Read our rules and guidelines\n"
-        description += "• Introduce yourself in the appropriate channels\n"
-        description += "• Have fun and make new friends!\n\n"
-        description += "If you need any help, don't hesitate to reach out to our staff team."
-        
-    elif 'shop' in prompt_lower or 'store' in prompt_lower:
-        description += "🛒 **Premium Store Experience**\n\n"
-        description += "Browse our exclusive collection of premium items:\n"
-        description += "• High-quality products\n"
-        description += "• Instant delivery\n"
-        description += "• 24/7 customer support\n"
-        description += "• Secure payment options\n\n"
-        description += "💎 *Your satisfaction is our priority!*"
-        
-    elif 'rule' in prompt_lower:
-        description += "📜 **Community Guidelines**\n\n"
-        description += "To maintain a positive environment for everyone:\n"
-        description += "• Be respectful to all members\n"
-        description += "• No spam or excessive self-promotion\n"
-        description += "• Use appropriate channels\n"
-        description += "• Follow Discord's Terms of Service\n\n"
-        description += "⚖️ *Breaking these rules may result in warnings or bans.*"
-        
-    elif 'support' in prompt_lower:
-        description += "🎫 **Support Information**\n\n"
-        description += "Our support team is here to help you 24/7!\n"
-        description += "• Create a ticket for personalized help\n"
-        description += "• Check our FAQ for quick answers\n"
-        description += "• Contact staff for urgent matters\n\n"
-        description += "⏱️ *Average response time: 15 minutes*"
-        
-    elif 'update' in prompt_lower:
-        description += "📋 **Important Update Information**\n\n"
-        description += "We've made some exciting changes and improvements!\n"
-        if 'bug' in prompt_lower or 'fix' in prompt_lower:
-            description += "🐛 Several bugs have been fixed\n"
-        if 'feature' in prompt_lower or 'new' in prompt_lower:
-            description += "✨ New features have been added\n"
-        description += "\n📈 *We're constantly improving your experience!*"
-        
-    else:
-        # Generic AI-generated content based on prompt
-        description += f"**Custom Content Generated**\n\n"
-        description += f"Based on your request: *{prompt[:100]}{'...' if len(prompt) > 100 else ''}*\n\n"
-        description += "This embed was intelligently created using advanced AI processing to match your specific requirements."
-    
-    # Add style-based modifications
-    if style:
-        if 'fun' in style.lower():
-            description += "\n\n🎉 *Let's have some fun!*"
-        elif 'professional' in style.lower():
-            description += "\n\n*Professional service guaranteed.*"
-        elif 'serious' in style.lower():
-            description += "\n\n*This is an important matter.*"
-    
-    return description
-
-def generate_ai_fields(prompt, prompt_lower, custom_fields):
-    """Generate intelligent fields based on context"""
-    fields = []
-    
-    # Parse custom fields if provided
-    if custom_fields:
-        try:
-            field_pairs = custom_fields.split('|')
-            for pair in field_pairs:
-                if ':' in pair:
-                    name, value = pair.split(':', 1)
-                    fields.append({
-                        'name': name.strip(),
-                        'value': value.strip(),
-                        'inline': len(value.strip()) < 50
-                    })
-        except Exception:
-            pass
-    
-    # AI-generated fields based on context
-    if 'tournament' in prompt_lower:
-        if not any('date' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '📅 Date & Time', 'value': 'To be announced soon!', 'inline': True})
-        if not any('prize' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '🏆 Prizes', 'value': 'Amazing rewards for winners!', 'inline': True})
-        if not any('platform' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '🎮 Platform', 'value': 'Check announcements', 'inline': True})
-    
-    elif 'giveaway' in prompt_lower:
-        if not any('duration' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '⏰ Duration', 'value': 'Limited time offer!', 'inline': True})
-        if not any('winner' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '🎯 Winners', 'value': 'Multiple winners selected', 'inline': True})
-    
-    elif 'shop' in prompt_lower or 'store' in prompt_lower:
-        if not any('payment' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '💳 Payment Methods', 'value': 'CashApp • Apple Pay', 'inline': True})
-        if not any('contact' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '📞 Contact', 'value': 'Contact: zpofe', 'inline': True})
-        if not any('delivery' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '🚚 Delivery', 'value': 'Instant delivery guaranteed', 'inline': True})
-    
-    elif 'support' in prompt_lower:
-        if not any('response' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '⏱️ Response Time', 'value': 'Usually within 15 minutes', 'inline': True})
-        if not any('hour' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '🕐 Availability', 'value': '24/7 Support Available', 'inline': True})
-    
-    elif 'welcome' in prompt_lower:
-        if not any('channel' in f.get('name', '').lower() for f in fields):
-            fields.append({'name': '📍 Important Channels', 'value': 'Check out our rules and announcements!', 'inline': False})
-    
-    # Add general helpful fields if none exist
-    if not fields and 'contact' in prompt_lower:
-        fields.append({'name': '📞 Contact Information', 'value': 'Contact: zpofe', 'inline': True})
-    
-    return fields
-
-def generate_ai_footer(prompt_lower, style):
-    """Generate intelligent footer text"""
-    
-    if 'shop' in prompt_lower or 'store' in prompt_lower:
-        return "ZSells Premium Store • Trusted by thousands of customers"
-    elif 'support' in prompt_lower:
-        return "ZSells Support System • We're here to help!"
-    elif 'tournament' in prompt_lower:
-        return "ZSells Gaming • Where legends are made"
-    elif 'giveaway' in prompt_lower:
-        return "ZSells Community • Bringing joy to our members"
-    elif 'welcome' in prompt_lower:
-        return "ZSells Community • Welcome to the family!"
-    elif style and 'professional' in style.lower():
-        return "ZSells Services • Professional excellence guaranteed"
-    else:
-        return "ZSells AI • Generated with advanced AI technology"
-
-def get_ai_thumbnail(prompt_lower):
-    """Get appropriate thumbnail URL based on context"""
-    # This would typically use actual image URLs
-    # For now, returning None as we don't have hosted images
-    # In a real implementation, you'd have a library of relevant images
-    return None
 
 # Admin Panel Embed Functions
 def create_admin_panel_embed():
@@ -1655,7 +1486,6 @@ def create_admin_panel_embed():
         description="```\n🔹 MASTER CONTROL PANEL 🔹\n━━━━━━━━━━━━━━━━━━━━━━━━━━\nAdvanced bot management system\n```\n**Select a target channel to begin operations**",
         color=0x2c2f33
     )
-    embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1234567890/settings.png")
 
     # Show detected channels with better formatting
     detected_channels = []
@@ -1689,13 +1519,13 @@ def create_admin_panel_embed():
 
     embed.add_field(
         name="🎛️ **Available Control Modules**",
-        value="```\n🎫 Support System     📢 Announcements\n⚔️ Gang Recruitment   🗑️ Bulk Management  \n🛒 Shop Interface     📋 Terms of Service\n📜 Server Rules       📰 News Broadcasting\n👋 Welcome System     🤖 AI Assistant\n```",
+        value="```\n🎫 Support System     📢 Announcements\n⚔️ Gang Recruitment   🗑️ Bulk Management  \n🛒 Shop Interface     📋 Terms of Service\n📜 Server Rules       📰 News Broadcasting\n👋 Welcome System     💬 Message Tools\n```",
         inline=True
     )
     
     embed.add_field(
         name="📊 **System Status**",
-        value="```yaml\nAI Module: Active\nAuto-Detection: Online\nWelcome Task: Running\nTicket System: Ready\nShop System: Operational\n```",
+        value="```yaml\nAuto-Detection: Online\nWelcome Task: Running\nTicket System: Ready\nShop System: Operational\nButtons: Active\n```",
         inline=True
     )
     
@@ -1704,7 +1534,7 @@ def create_admin_panel_embed():
         value="```\n1️⃣ Select target channel\n2️⃣ Choose control module\n3️⃣ Configure settings\n4️⃣ Deploy instantly\n```",
         inline=False
     )
-    embed.set_footer(text="ZSells Administrative Console v2.0 • Secure Access Granted", icon_url="https://cdn.discordapp.com/emojis/123456789.png")
+    embed.set_footer(text="ZSells Administrative Console v2.0 • Secure Access Granted")
     return embed
 
 def create_admin_control_embed(target_channel):
@@ -1714,10 +1544,10 @@ def create_admin_control_embed(target_channel):
         color=0x5865f2
     )
 
-    # AI & Advanced Features Section
+    # Creation Tools Section
     embed.add_field(
-        name="🤖 **Artificial Intelligence Module**",
-        value="```yaml\nAI Embed Creator:\n  ├─ Smart Content Generation\n  ├─ Context-Aware Responses  \n  ├─ Dynamic Field Creation\n  └─ Advanced Formatting\n```\n**Status:** `READY` ⚡",
+        name="📝 **Content Creation Tools**",
+        value="```yaml\nEmbed Creator:\n  ├─ Custom Embed Builder\n  ├─ Color & Field Support  \n  ├─ Footer Customization\n  └─ Rich Formatting\n\nMessage Creator:\n  ├─ Simple Message Sender\n  ├─ Role Ping Support\n  └─ Quick Broadcasting\n```\n**Status:** `READY` ⚡",
         inline=True
     )
 
@@ -1759,14 +1589,32 @@ AUTHORIZED_USER_ID = 1385239185006268457
 @bot.tree.command(name='admin', description='Open the advanced admin control panel with AI features')
 async def admin_panel(interaction: discord.Interaction):
     """Open the advanced admin control panel with AI features"""
-    # Check if user is authorized
-    if not has_admin_permissions(interaction.user, interaction.guild):
-        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-        return
+    try:
+        # Check if user is authorized first
+        if not has_admin_permissions(interaction.user, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+            return
 
-    embed = create_admin_panel_embed()
-    view = ChannelSelectView(interaction.guild)
-    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        # Respond immediately to prevent timeout
+        await interaction.response.defer(ephemeral=True)
+
+        embed = create_admin_panel_embed()
+        view = ChannelSelectView(interaction.guild)
+        
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            
+    except discord.NotFound:
+        pass  # Interaction expired, ignore silently
+    except discord.HTTPException as e:
+        if e.status != 404:  # Don't log 404 errors
+            print(f"⚠️ HTTP error in admin command: {e}")
+    except Exception as e:
+        print(f"⚠️ Error in admin command: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred. Please try again.", ephemeral=True)
+        except:
+            pass
 
 
 
@@ -1789,6 +1637,8 @@ async def news_command(interaction: discord.Interaction, title: str = None, cont
     save_data()
 
     await interaction.response.send_message("✅ News content updated! Use `/admin` to spawn the updated news panel.", ephemeral=True)
+
+
 
 @bot.tree.command(name='refresh_channels', description='Refresh auto-detected channels')
 async def refresh_channels(interaction: discord.Interaction):
