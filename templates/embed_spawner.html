@@ -1,0 +1,865 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZSells - Discord Embed Spawner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+        
+        .card h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+        
+        select, input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .embed-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .embed-btn {
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .embed-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+        
+        .support-btn { background: #48bb78; color: white; }
+        .gang-btn { background: #ed8936; color: white; }
+        .shop-btn { background: #38b2ac; color: white; }
+        .tos-btn { background: #4299e1; color: white; }
+        .rules-btn { background: #9f7aea; color: white; }
+        .news-btn { background: #f56565; color: white; }
+        .welcome-btn { background: #68d391; color: white; }
+        .reminder-btn { background: #fbb6ce; color: #2d3748; }
+        .verification-btn { background: #4fd1c7; color: white; }
+        
+        .detected-channel {
+            background: linear-gradient(90deg, #48bb78, #38a169) !important;
+            color: white !important;
+            position: relative;
+        }
+        
+        .detected-channel::after {
+            content: "🎯 " attr(data-type);
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+        
+        .channel-info {
+            background: rgba(72, 187, 120, 0.1);
+            border: 1px solid #48bb78;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .detection-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .stat-item {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+        
+        .refresh-btn {
+            background: #38b2ac;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+            transition: all 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #319795;
+            transform: scale(1.05);
+        }
+        
+        .create-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .create-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .saved-embed-item {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .saved-embed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .saved-embed-name {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        
+        .saved-embed-date {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .saved-embed-preview {
+            background: #36393f;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 10px 0;
+            border-left: 4px solid #7289da;
+            color: white;
+            font-family: 'Segoe UI';
+        }
+        
+        .saved-embed-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .saved-embed-description {
+            color: #dcddde;
+            font-size: 14px;
+        }
+        
+        .saved-embed-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .spawn-saved-btn {
+            background: #48bb78;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .spawn-saved-btn:hover {
+            background: #38a169;
+            transform: scale(1.05);
+        }
+        
+        .delete-saved-btn {
+            background: #f56565;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        
+        .delete-saved-btn:hover {
+            background: #e53e3e;
+            transform: scale(1.05);
+        }
+        
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+        
+        .status.error {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+        
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 5px;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @media (max-width: 768px) {
+            .embed-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 ZSells Discord Embed Spawner</h1>
+        <p>Deploy Discord Embeds and Create Custom Messages</p>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h3>📍 Channel Selection</h3>
+            <div class="form-group">
+                <label for="guild-select">Select Server:</label>
+                <select id="guild-select" onchange="loadChannels()">
+                    <option value="">Loading servers...</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="channel-select">
+                    Select Channel:
+                    <button class="refresh-btn" onclick="refreshDetection()">🔄 Refresh Detection</button>
+                </label>
+                <select id="channel-select">
+                    <option value="">Select a server first</option>
+                </select>
+                <div id="channel-info" class="channel-info" style="display: none;">
+                    <h4>🎯 Auto-Detection Results</h4>
+                    <div id="detection-stats" class="detection-stats"></div>
+                    <p><strong>Detected Channels:</strong> Channels are automatically identified by name patterns and marked with 🎯 badges.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('presets')">🎯 Preset Embeds</div>
+                <div class="tab" onclick="switchTab('custom')">✨ Custom Embed</div>
+                <div class="tab" onclick="switchTab('saved')">💾 My Embeds</div>
+            </div>
+            
+            <div id="presets" class="tab-content active">
+                <h3>🎯 Preset Discord Embeds</h3>
+                <div class="embed-grid">
+                    <button class="embed-btn support-btn" onclick="spawnEmbed('support')">
+                        🎫 Support Tickets<br><small>Interactive support system</small>
+                    </button>
+                    <button class="embed-btn gang-btn" onclick="spawnEmbed('gang')">
+                        ⚔️ Gang Recruitment<br><small>Join gang system</small>
+                    </button>
+                    <button class="embed-btn shop-btn" onclick="spawnEmbed('shop')">
+                        🛒 Interactive Shop<br><small>Browse products</small>
+                    </button>
+                    <button class="embed-btn tos-btn" onclick="spawnEmbed('tos')">
+                        📋 Terms of Service<br><small>Server terms</small>
+                    </button>
+                    <button class="embed-btn rules-btn" onclick="spawnEmbed('rules')">
+                        📜 Server Rules<br><small>Community guidelines</small>
+                    </button>
+                    <button class="embed-btn news-btn" onclick="spawnEmbed('news')">
+                        📰 News Updates<br><small>Latest announcements</small>
+                    </button>
+                    <button class="embed-btn welcome-btn" onclick="spawnEmbed('welcome')">
+                        👋 Welcome Message<br><small>Greet new members</small>
+                    </button>
+                    <button class="embed-btn reminder-btn" onclick="spawnEmbed('reminder')">
+                        💎 Shop Reminder<br><small>Promote shop activity</small>
+                    </button>
+                    <button class="embed-btn verification-btn" onclick="spawnEmbed('verification')">
+                        ✅ Verification Panel<br><small>Server verification</small>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="custom" class="tab-content">
+                <h3>✨ Custom Embed Creator</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div class="form-group">
+                            <label for="embed-title">Embed Title:</label>
+                            <input type="text" id="embed-title" placeholder="Enter embed title..." oninput="previewEmbed()">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="embed-description">Embed Description:</label>
+                            <textarea id="embed-description" rows="4" placeholder="Enter embed description..." oninput="previewEmbed()"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="embed-color">Embed Color (hex without #):</label>
+                            <input type="text" id="embed-color" placeholder="Example: 7289da for Discord blue, ff0000 for red" oninput="previewEmbed()">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="embed-name">Save Name (optional):</label>
+                            <input type="text" id="embed-name" placeholder="Enter name to save this embed...">
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px;">
+                            <button class="create-btn" onclick="createCustomEmbed('spawn')" style="flex: 1;">
+                                🚀 Spawn Embed
+                            </button>
+                            <button class="create-btn" onclick="createCustomEmbed('save')" style="flex: 1; background: #48bb78;">
+                                💾 Save Embed
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4>📋 Live Preview</h4>
+                        <div id="embed-preview" style="background: #36393f; border-radius: 8px; padding: 15px; color: white; font-family: 'Segoe UI'; border-left: 4px solid #7289da;">
+                            <div id="preview-title" style="font-weight: 600; margin-bottom: 8px; color: white;">Custom Embed</div>
+                            <div id="preview-description" style="color: #dcddde;">No description provided.</div>
+                            <div id="preview-footer" style="font-size: 12px; color: #72767d; margin-top: 10px;">ZSells Custom Embed Creator</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="saved" class="tab-content">
+                <h3>💾 My Saved Embeds</h3>
+                <div id="saved-embeds-container">
+                    <div style="text-align: center; color: #666; padding: 40px;">
+                        Loading saved embeds...
+                    </div>
+                </div>
+            </div>
+            
+            <div id="status"></div>
+        </div>
+    </div>
+    
+    <script>
+        let guildsData = [];
+        
+        async function loadGuilds() {
+            try {
+                const response = await fetch('/get_guilds');
+                const data = await response.json();
+                guildsData = data.guilds;
+                
+                const guildSelect = document.getElementById('guild-select');
+                guildSelect.innerHTML = '<option value="">Select a server...</option>';
+                
+                guildsData.forEach(guild => {
+                    const option = document.createElement('option');
+                    option.value = guild.id;
+                    option.textContent = `${guild.name} (${guild.member_count} members)`;
+                    guildSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading guilds:', error);
+                showStatus('Error loading servers. Make sure the bot is running.', 'error');
+            }
+        }
+        
+        function loadChannels() {
+            const guildId = document.getElementById('guild-select').value;
+            const channelSelect = document.getElementById('channel-select');
+            const channelInfo = document.getElementById('channel-info');
+            const detectionStats = document.getElementById('detection-stats');
+            
+            channelSelect.innerHTML = '<option value="">Select a channel...</option>';
+            
+            if (!guildId) {
+                channelInfo.style.display = 'none';
+                return;
+            }
+            
+            const guild = guildsData.find(g => g.id == guildId);
+            if (!guild) return;
+            
+            // Show detection info
+            channelInfo.style.display = 'block';
+            
+            // Update detection stats
+            detectionStats.innerHTML = `
+                <div class="stat-item">
+                    <strong>${guild.total_detected || 0}</strong><br>
+                    <small>Auto-Detected</small>
+                </div>
+                <div class="stat-item">
+                    <strong>${guild.channels.length}</strong><br>
+                    <small>Total Channels</small>
+                </div>
+                <div class="stat-item">
+                    <strong>${guild.member_count}</strong><br>
+                    <small>Members</small>
+                </div>
+            `;
+            
+            // Sort channels: detected first, then others
+            const detectedChannels = guild.channels.filter(ch => ch.auto_detected);
+            const otherChannels = guild.channels.filter(ch => !ch.auto_detected);
+            
+            // Add detected channels first
+            if (detectedChannels.length > 0) {
+                const detectedGroup = document.createElement('optgroup');
+                detectedGroup.label = '🎯 Auto-Detected Channels';
+                channelSelect.appendChild(detectedGroup);
+                
+                detectedChannels.forEach(channel => {
+                    const option = document.createElement('option');
+                    option.value = channel.id;
+                    option.className = 'detected-channel';
+                    option.setAttribute('data-type', channel.detected_type.toUpperCase());
+                    option.textContent = `#${channel.name} (${channel.detected_type})${channel.permissions ? ' ✅' : ' ⚠️'}`;
+                    detectedGroup.appendChild(option);
+                });
+            }
+            
+            // Add other channels
+            if (otherChannels.length > 0) {
+                const otherGroup = document.createElement('optgroup');
+                otherGroup.label = '📝 Other Channels';
+                channelSelect.appendChild(otherGroup);
+                
+                otherChannels.forEach(channel => {
+                    const option = document.createElement('option');
+                    option.value = channel.id;
+                    option.textContent = `#${channel.name}${channel.permissions ? ' ✅' : ' ⚠️'}`;
+                    otherGroup.appendChild(option);
+                });
+            }
+        }
+        
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Load saved embeds when switching to saved tab
+            if (tabName === 'saved') {
+                loadSavedEmbeds();
+            }
+        }
+        
+        async function spawnEmbed(embedType) {
+            const channelId = document.getElementById('channel-select').value;
+            if (!channelId) {
+                showStatus('Please select a channel first!', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/spawn_embed', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        embed_type: embedType,
+                        channel_id: channelId
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(data.message, 'success');
+                } else {
+                    showStatus(data.error || 'Unknown error occurred', 'error');
+                }
+            } catch (error) {
+                showStatus('Error spawning embed: ' + error.message, 'error');
+            }
+        }
+        
+        async function createCustomEmbed(action = 'spawn') {
+            const title = document.getElementById('embed-title').value;
+            const description = document.getElementById('embed-description').value;
+            const color = document.getElementById('embed-color').value;
+            
+            if (!title && !description) {
+                showStatus('Please enter at least a title or description!', 'error');
+                return;
+            }
+            
+            if (action === 'spawn') {
+                const channelId = document.getElementById('channel-select').value;
+                if (!channelId) {
+                    showStatus('Please select a channel first!', 'error');
+                    return;
+                }
+            } else if (action === 'save') {
+                const embedName = document.getElementById('embed-name').value;
+                if (!embedName) {
+                    showStatus('Please enter a name to save the embed!', 'error');
+                    return;
+                }
+            }
+            
+            try {
+                const requestBody = {
+                    action: action,
+                    title: title,
+                    description: description,
+                    color: color
+                };
+                
+                if (action === 'spawn') {
+                    requestBody.channel_id = document.getElementById('channel-select').value;
+                } else if (action === 'save') {
+                    requestBody.embed_name = document.getElementById('embed-name').value;
+                }
+                
+                const response = await fetch('/create_custom_embed', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(data.message, 'success');
+                    if (action === 'spawn') {
+                        // Clear form after spawning
+                        document.getElementById('embed-title').value = '';
+                        document.getElementById('embed-description').value = '';
+                        document.getElementById('embed-color').value = '';
+                        document.getElementById('embed-name').value = '';
+                        previewEmbed();
+                    } else if (action === 'save') {
+                        document.getElementById('embed-name').value = '';
+                        loadSavedEmbeds();
+                    }
+                } else {
+                    showStatus(data.error || 'Unknown error occurred', 'error');
+                }
+            } catch (error) {
+                showStatus('Error with custom embed: ' + error.message, 'error');
+            }
+        }
+        
+        function previewEmbed() {
+            const title = document.getElementById('embed-title').value || 'Custom Embed';
+            const description = document.getElementById('embed-description').value || 'No description provided.';
+            const color = document.getElementById('embed-color').value || '7289da';
+            
+            document.getElementById('preview-title').textContent = title;
+            document.getElementById('preview-description').textContent = description;
+            
+            // Update border color
+            const preview = document.getElementById('embed-preview');
+            try {
+                const colorHex = color.startsWith('#') ? color : '#' + color;
+                preview.style.borderLeftColor = colorHex;
+            } catch (e) {
+                preview.style.borderLeftColor = '#7289da';
+            }
+        }
+        
+        async function loadSavedEmbeds() {
+            try {
+                const response = await fetch('/get_saved_embeds');
+                const data = await response.json();
+                
+                const container = document.getElementById('saved-embeds-container');
+                
+                if (data.embeds && data.embeds.length > 0) {
+                    container.innerHTML = data.embeds.map(embed => `
+                        <div class="saved-embed-item">
+                            <div class="saved-embed-header">
+                                <div class="saved-embed-name">${embed.name}</div>
+                                <div class="saved-embed-date">${new Date(embed.created_at).toLocaleDateString()}</div>
+                            </div>
+                            <div class="saved-embed-preview" style="border-left-color: #${embed.color}">
+                                <div class="saved-embed-title">${embed.title}</div>
+                                <div class="saved-embed-description">${embed.description}</div>
+                            </div>
+                            <div class="saved-embed-actions">
+                                <button class="spawn-saved-btn" onclick="spawnSavedEmbed(${embed.id})">
+                                    🚀 Spawn
+                                </button>
+                                <button class="delete-saved-btn" onclick="deleteSavedEmbed(${embed.id})">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `
+                        <div style="text-align: center; color: #666; padding: 40px;">
+                            <h4>No saved embeds yet</h4>
+                            <p>Create and save custom embeds to see them here!</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading saved embeds:', error);
+                showStatus('Error loading saved embeds', 'error');
+            }
+        }
+        
+        async function spawnSavedEmbed(embedId) {
+            const channelId = document.getElementById('channel-select').value;
+            if (!channelId) {
+                showStatus('Please select a channel first!', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/spawn_saved_embed', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        embed_id: embedId,
+                        channel_id: channelId
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(data.message, 'success');
+                } else {
+                    showStatus(data.error || 'Unknown error occurred', 'error');
+                }
+            } catch (error) {
+                showStatus('Error spawning saved embed: ' + error.message, 'error');
+            }
+        }
+        
+        async function deleteSavedEmbed(embedId) {
+            if (!confirm('Are you sure you want to delete this embed?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/delete_saved_embed', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        embed_id: embedId
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(data.message, 'success');
+                    loadSavedEmbeds(); // Reload the list
+                } else {
+                    showStatus(data.error || 'Unknown error occurred', 'error');
+                }
+            } catch (error) {
+                showStatus('Error deleting saved embed: ' + error.message, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+            setTimeout(() => {
+                statusDiv.innerHTML = '';
+            }, 5000);
+        }
+        
+        async function refreshDetection() {
+            const guildId = document.getElementById('guild-select').value;
+            
+            try {
+                showStatus('🔄 Refreshing channel detection...', 'success');
+                
+                const response = await fetch('/refresh_detection', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        guild_id: guildId || null
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    showStatus(`✅ ${data.message} (${data.detected_count || data.total_detected} channels detected)`, 'success');
+                    
+                    // Reload guilds data
+                    await loadGuilds();
+                    
+                    // Reload channels for current guild
+                    if (guildId) {
+                        loadChannels();
+                    }
+                } else {
+                    showStatus(data.error || 'Unknown error occurred', 'error');
+                }
+            } catch (error) {
+                showStatus('Error refreshing detection: ' + error.message, 'error');
+            }
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadGuilds();
+            previewEmbed(); // Initialize preview
+        });
+    </script>
+</body>
+</html>

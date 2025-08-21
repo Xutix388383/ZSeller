@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZSells Admin Panel - Access Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .access-container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+        }
+        
+        .logo {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .status-info {
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        
+        .authenticated {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ffa726 100%);
+            color: white;
+        }
+        
+        .not-authenticated {
+            background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+            color: white;
+        }
+        
+        .access-denied {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+        }
+        
+        .auth-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin: 10px 0;
+        }
+        
+        .auth-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .features {
+            margin-top: 30px;
+            text-align: left;
+        }
+        
+        .features h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .features ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .features li {
+            padding: 5px 0;
+            color: #666;
+        }
+        
+        .features li:before {
+            content: "🔒 ";
+            margin-right: 8px;
+        }
+        
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="access-container">
+        <div class="logo">🛡️ ZSells</div>
+        <div class="subtitle">Secure Administrative Access</div>
+        
+        {% if is_authenticated %}
+            {% if user_name == authorized_user %}
+                <div class="status-info authenticated">
+                    <h3>✅ Access Granted</h3>
+                    <p>Welcome back, {{ user_name }}!</p>
+                    <div class="user-info">
+                        <strong>Authenticated as:</strong> {{ user_name }}<br>
+                        <strong>Role:</strong> System Administrator
+                    </div>
+                    <a href="/" class="auth-button">🚀 Enter Admin Panel</a>
+                </div>
+            {% else %}
+                <div class="status-info access-denied">
+                    <h3>❌ Access Denied</h3>
+                    <p>This admin panel is restricted to {{ authorized_user }} only.</p>
+                    <div class="user-info">
+                        <strong>Your account:</strong> {{ user_name }}<br>
+                        <strong>Status:</strong> Unauthorized
+                    </div>
+                    <p style="margin-top: 15px; font-size: 14px;">
+                        If you believe this is an error, contact the system administrator.
+                    </p>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="status-info not-authenticated">
+                <h3>🔐 Login with Replit</h3>
+                <p>Click the button below to authenticate with your Replit account.</p>
+                <p style="margin-top: 10px; font-size: 14px;">
+                    Only <strong>{{ authorized_user }}</strong> can access this admin panel.
+                </p>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <script
+                    authed="location.reload()"
+                    src="https://auth.util.repl.co/script.js"
+                ></script>
+            </div>
+        {% endif %}</div>
+        
+        <div class="features">
+            <h3>🔒 Security Features</h3>
+            <ul>
+                <li>Replit Account Authentication</li>
+                <li>Single User Access Control</li>
+                <li>Discord Bot Management</li>
+                <li>Secure Embed Spawning</li>
+                <li>Real-time Server Monitoring</li>
+                <li>Protected API Endpoints</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
