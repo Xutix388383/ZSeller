@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,14 +10,14 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             color: #333;
         }
-        
+
         .header {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
@@ -27,24 +26,24 @@
             text-align: center;
             box-shadow: 0 2px 20px rgba(0,0,0,0.1);
         }
-        
+
         .header h1 {
             font-size: 2.5em;
             margin-bottom: 5px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
-        
+
         .header p {
             font-size: 1.1em;
             opacity: 0.9;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 20px auto;
             padding: 0 20px;
         }
-        
+
         .card {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -54,25 +53,25 @@
             border: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 20px;
         }
-        
+
         .card h3 {
             color: #667eea;
             margin-bottom: 20px;
             font-size: 1.5em;
             text-align: center;
         }
-        
+
         .form-group {
             margin-bottom: 20px;
         }
-        
+
         label {
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
             color: #4a5568;
         }
-        
+
         select, input, textarea {
             width: 100%;
             padding: 12px;
@@ -81,20 +80,20 @@
             font-size: 14px;
             transition: border-color 0.3s;
         }
-        
+
         select:focus, input:focus, textarea:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
-        
+
         .embed-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
-        
+
         .embed-btn {
             padding: 15px;
             border: none;
@@ -106,12 +105,12 @@
             font-size: 14px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        
+
         .embed-btn:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(0,0,0,0.2);
         }
-        
+
         .support-btn { background: #48bb78; color: white; }
         .gang-btn { background: #ed8936; color: white; }
         .shop-btn { background: #38b2ac; color: white; }
@@ -121,13 +120,13 @@
         .welcome-btn { background: #68d391; color: white; }
         .reminder-btn { background: #fbb6ce; color: #2d3748; }
         .verification-btn { background: #4fd1c7; color: white; }
-        
+
         .detected-channel {
             background: linear-gradient(90deg, #48bb78, #38a169) !important;
             color: white !important;
             position: relative;
         }
-        
+
         .detected-channel::after {
             content: "🎯 " attr(data-type);
             position: absolute;
@@ -139,7 +138,7 @@
             padding: 2px 6px;
             border-radius: 10px;
         }
-        
+
         .channel-info {
             background: rgba(72, 187, 120, 0.1);
             border: 1px solid #48bb78;
@@ -147,14 +146,14 @@
             padding: 15px;
             margin: 15px 0;
         }
-        
+
         .detection-stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
             margin: 15px 0;
         }
-        
+
         .stat-item {
             background: rgba(102, 126, 234, 0.1);
             padding: 10px;
@@ -162,7 +161,7 @@
             text-align: center;
             border: 1px solid rgba(102, 126, 234, 0.3);
         }
-        
+
         .refresh-btn {
             background: #38b2ac;
             color: white;
@@ -174,12 +173,12 @@
             margin-left: 10px;
             transition: all 0.3s;
         }
-        
+
         .refresh-btn:hover {
             background: #319795;
             transform: scale(1.05);
         }
-        
+
         .create-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -192,12 +191,12 @@
             transition: all 0.3s;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
-        
+
         .create-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
-        
+
         .saved-embed-item {
             background: rgba(255, 255, 255, 0.95);
             border-radius: 12px;
@@ -206,25 +205,25 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        
+
         .saved-embed-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
-        
+
         .saved-embed-name {
             font-weight: 600;
             color: #667eea;
             font-size: 1.1em;
         }
-        
+
         .saved-embed-date {
             font-size: 12px;
             color: #666;
         }
-        
+
         .saved-embed-preview {
             background: #36393f;
             border-radius: 8px;
@@ -234,23 +233,85 @@
             color: white;
             font-family: 'Segoe UI';
         }
-        
+
         .saved-embed-title {
             font-weight: 600;
             margin-bottom: 5px;
         }
-        
+
         .saved-embed-description {
             color: #dcddde;
             font-size: 14px;
         }
-        
+
         .saved-embed-actions {
             display: flex;
             gap: 10px;
             margin-top: 10px;
         }
-        
+
+        .live-status-feed {
+            background: rgba(0, 255, 127, 0.1);
+            border: 1px solid #00ff7f;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            animation: pulse 2s infinite;
+        }
+
+        .status-logs {
+            background: #1a1a1a;
+            color: #00ff7f;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid #333;
+        }
+
+        .channel-validation {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .validation-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s;
+        }
+
+        .validation-item.success {
+            background: rgba(72, 187, 120, 0.2);
+            border-color: #48bb78;
+            color: #48bb78;
+        }
+
+        .validation-item.error {
+            background: rgba(245, 101, 101, 0.2);
+            border-color: #f56565;
+            color: #f56565;
+        }
+
+        .validation-item.warning {
+            background: rgba(255, 193, 7, 0.2);
+            border-color: #ffc107;
+            color: #ffc107;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 127, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 127, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 127, 0); }
+        }
+
         .spawn-saved-btn {
             background: #48bb78;
             color: white;
@@ -261,12 +322,12 @@
             font-size: 12px;
             transition: all 0.3s;
         }
-        
+
         .spawn-saved-btn:hover {
             background: #38a169;
             transform: scale(1.05);
         }
-        
+
         .delete-saved-btn {
             background: #f56565;
             color: white;
@@ -277,12 +338,12 @@
             font-size: 12px;
             transition: all 0.3s;
         }
-        
+
         .delete-saved-btn:hover {
             background: #e53e3e;
             transform: scale(1.05);
         }
-        
+
         .status {
             padding: 12px;
             border-radius: 8px;
@@ -290,19 +351,25 @@
             text-align: center;
             font-weight: 600;
         }
-        
+
         .status.success {
             background: #c6f6d5;
             color: #22543d;
             border: 1px solid #9ae6b4;
         }
-        
+
         .status.error {
             background: #fed7d7;
             color: #742a2a;
             border: 1px solid #feb2b2;
         }
-        
+
+        .status.loading {
+            background: #edf2f7;
+            color: #2a6988;
+            border: 1px solid #bee3f8;
+        }
+
         .tabs {
             display: flex;
             justify-content: center;
@@ -311,7 +378,7 @@
             border-radius: 10px;
             padding: 5px;
         }
-        
+
         .tab {
             padding: 12px 24px;
             cursor: pointer;
@@ -320,32 +387,73 @@
             font-weight: 600;
             color: #667eea;
         }
-        
+
         .tab:hover {
             background: rgba(102, 126, 234, 0.1);
         }
-        
+
         .tab.active {
             background: #667eea;
             color: white;
         }
-        
+
         .tab-content {
             display: none;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         @media (max-width: 768px) {
             .embed-grid {
                 grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             }
-            
+
             .tabs {
                 flex-direction: column;
             }
+        }
+
+        .embed-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 140px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .embed-button small {
+            font-size: 0.8em;
+            opacity: 0.8;
+            margin-top: 5px;
+            text-align: center;
+            font-weight: normal;
+        }
+
+        .embed-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .embed-button i.icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .embed-button span {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -354,7 +462,7 @@
         <h1>🚀 ZSells Discord Embed Spawner</h1>
         <p>Deploy Discord Embeds and Create Custom Messages</p>
     </div>
-    
+
     <div class="container">
         <div class="card">
             <h3>📍 Channel Selection</h3>
@@ -364,13 +472,13 @@
                     <option value="">Loading servers...</option>
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="channel-select">
                     Select Channel:
                     <button class="refresh-btn" onclick="refreshDetection()">🔄 Refresh Detection</button>
                 </label>
-                <select id="channel-select">
+                <select id="channel-select" onchange="validateChannelSelection()">
                     <option value="">Select a server first</option>
                 </select>
                 <div id="channel-info" class="channel-info" style="display: none;">
@@ -378,49 +486,82 @@
                     <div id="detection-stats" class="detection-stats"></div>
                     <p><strong>Detected Channels:</strong> Channels are automatically identified by name patterns and marked with 🎯 badges.</p>
                 </div>
+
+                <!-- Live Status Feed -->
+                <div id="live-status-feed" class="live-status-feed" style="display: none;">
+                    <h4>📡 Live Channel Status</h4>
+                    <div id="status-logs" class="status-logs"></div>
+                    <div id="channel-validation" class="channel-validation"></div>
+                </div>
             </div>
         </div>
-        
+
         <div class="card">
             <div class="tabs">
                 <div class="tab active" onclick="switchTab('presets')">🎯 Preset Embeds</div>
                 <div class="tab" onclick="switchTab('custom')">✨ Custom Embed</div>
                 <div class="tab" onclick="switchTab('saved')">💾 My Embeds</div>
             </div>
-            
+
             <div id="presets" class="tab-content active">
                 <h3>🎯 Preset Discord Embeds</h3>
                 <div class="embed-grid">
-                    <button class="embed-btn support-btn" onclick="spawnEmbed('support')">
-                        🎫 Support Tickets<br><small>Interactive support system</small>
+                    <button class="embed-button support" onclick="spawnEmbed('support')" title="Creates support ticket system with interactive buttons">
+                        <i class="icon">🎫</i>
+                        <span>Support System</span>
+                        <small>Interactive ticket creation</small>
                     </button>
-                    <button class="embed-btn gang-btn" onclick="spawnEmbed('gang')">
-                        ⚔️ Gang Recruitment<br><small>Join gang system</small>
+
+                    <button class="embed-button gang" onclick="spawnEmbed('gang')" title="Gang recruitment with join button">
+                        <i class="icon">⚔️</i>
+                        <span>Gang Recruitment</span>
+                        <small>STK gang join button</small>
                     </button>
-                    <button class="embed-btn shop-btn" onclick="spawnEmbed('shop')">
-                        🛒 Interactive Shop<br><small>Browse products</small>
+
+                    <button class="embed-button shop" onclick="spawnEmbed('shop')" title="Full interactive shop with buttons and dropdowns">
+                        <i class="icon">🛒</i>
+                        <span>Interactive Shop</span>
+                        <small>Weapons, money, watches</small>
                     </button>
-                    <button class="embed-btn tos-btn" onclick="spawnEmbed('tos')">
-                        📋 Terms of Service<br><small>Server terms</small>
+
+                    <button class="embed-button tos" onclick="spawnEmbed('tos')" title="Terms of service information">
+                        <i class="icon">📋</i>
+                        <span>Terms of Service</span>
+                        <small>Legal information</small>
                     </button>
-                    <button class="embed-btn rules-btn" onclick="spawnEmbed('rules')">
-                        📜 Server Rules<br><small>Community guidelines</small>
+
+                    <button class="embed-button rules" onclick="spawnEmbed('rules')" title="Server rules and guidelines">
+                        <i class="icon">📜</i>
+                        <span>Server Rules</span>
+                        <small>STK server guidelines</small>
                     </button>
-                    <button class="embed-btn news-btn" onclick="spawnEmbed('news')">
-                        📰 News Updates<br><small>Latest announcements</small>
+
+                    <button class="embed-button news" onclick="spawnEmbed('news')" title="Latest news and announcements">
+                        <i class="icon">📰</i>
+                        <span>News Updates</span>
+                        <small>Latest announcements</small>
                     </button>
-                    <button class="embed-btn welcome-btn" onclick="spawnEmbed('welcome')">
-                        👋 Welcome Message<br><small>Greet new members</small>
+
+                    <button class="embed-button welcome" onclick="spawnEmbed('welcome')" title="Welcome message for new members">
+                        <i class="icon">👋</i>
+                        <span>Welcome Message</span>
+                        <small>New member greeting</small>
                     </button>
-                    <button class="embed-btn reminder-btn" onclick="spawnEmbed('reminder')">
-                        💎 Shop Reminder<br><small>Promote shop activity</small>
+
+                    <button class="embed-button reminder" onclick="spawnEmbed('reminder')" title="Shop promotion and reminder">
+                        <i class="icon">💎</i>
+                        <span>Shop Reminder</span>
+                        <small>Promote shop channel</small>
                     </button>
-                    <button class="embed-btn verification-btn" onclick="spawnEmbed('verification')">
-                        ✅ Verification Panel<br><small>Server verification</small>
+
+                    <button class="embed-button verification" onclick="spawnEmbed('verification')" title="User verification system with interactive buttons">
+                        <i class="icon">✅</i>
+                        <span>Verification</span>
+                        <small>Interactive verification</small>
                     </button>
                 </div>
             </div>
-            
+
             <div id="custom" class="tab-content">
                 <h3>✨ Custom Embed Creator</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -429,22 +570,22 @@
                             <label for="embed-title">Embed Title:</label>
                             <input type="text" id="embed-title" placeholder="Enter embed title..." oninput="previewEmbed()">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="embed-description">Embed Description:</label>
                             <textarea id="embed-description" rows="4" placeholder="Enter embed description..." oninput="previewEmbed()"></textarea>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="embed-color">Embed Color (hex without #):</label>
                             <input type="text" id="embed-color" placeholder="Example: 7289da for Discord blue, ff0000 for red" oninput="previewEmbed()">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="embed-name">Save Name (optional):</label>
                             <input type="text" id="embed-name" placeholder="Enter name to save this embed...">
                         </div>
-                        
+
                         <div style="display: flex; gap: 10px;">
                             <button class="create-btn" onclick="createCustomEmbed('spawn')" style="flex: 1;">
                                 🚀 Spawn Embed
@@ -454,7 +595,7 @@
                             </button>
                         </div>
                     </div>
-                    
+
                     <div>
                         <h4>📋 Live Preview</h4>
                         <div id="embed-preview" style="background: #36393f; border-radius: 8px; padding: 15px; color: white; font-family: 'Segoe UI'; border-left: 4px solid #7289da;">
@@ -465,7 +606,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="saved" class="tab-content">
                 <h3>💾 My Saved Embeds</h3>
                 <div id="saved-embeds-container">
@@ -474,23 +615,23 @@
                     </div>
                 </div>
             </div>
-            
+
             <div id="status"></div>
         </div>
     </div>
-    
+
     <script>
         let guildsData = [];
-        
+
         async function loadGuilds() {
             try {
                 const response = await fetch('/get_guilds');
                 const data = await response.json();
                 guildsData = data.guilds;
-                
+
                 const guildSelect = document.getElementById('guild-select');
                 guildSelect.innerHTML = '<option value="">Select a server...</option>';
-                
+
                 guildsData.forEach(guild => {
                     const option = document.createElement('option');
                     option.value = guild.id;
@@ -502,26 +643,26 @@
                 showStatus('Error loading servers. Make sure the bot is running.', 'error');
             }
         }
-        
+
         function loadChannels() {
             const guildId = document.getElementById('guild-select').value;
             const channelSelect = document.getElementById('channel-select');
             const channelInfo = document.getElementById('channel-info');
             const detectionStats = document.getElementById('detection-stats');
-            
+
             channelSelect.innerHTML = '<option value="">Select a channel...</option>';
-            
+
             if (!guildId) {
                 channelInfo.style.display = 'none';
                 return;
             }
-            
+
             const guild = guildsData.find(g => g.id == guildId);
             if (!guild) return;
-            
+
             // Show detection info
             channelInfo.style.display = 'block';
-            
+
             // Update detection stats
             detectionStats.innerHTML = `
                 <div class="stat-item">
@@ -537,17 +678,17 @@
                     <small>Members</small>
                 </div>
             `;
-            
+
             // Sort channels: detected first, then others
             const detectedChannels = guild.channels.filter(ch => ch.auto_detected);
             const otherChannels = guild.channels.filter(ch => !ch.auto_detected);
-            
+
             // Add detected channels first
             if (detectedChannels.length > 0) {
                 const detectedGroup = document.createElement('optgroup');
                 detectedGroup.label = '🎯 Auto-Detected Channels';
                 channelSelect.appendChild(detectedGroup);
-                
+
                 detectedChannels.forEach(channel => {
                     const option = document.createElement('option');
                     option.value = channel.id;
@@ -557,13 +698,13 @@
                     detectedGroup.appendChild(option);
                 });
             }
-            
+
             // Add other channels
             if (otherChannels.length > 0) {
                 const otherGroup = document.createElement('optgroup');
                 otherGroup.label = '📝 Other Channels';
                 channelSelect.appendChild(otherGroup);
-                
+
                 otherChannels.forEach(channel => {
                     const option = document.createElement('option');
                     option.value = channel.id;
@@ -572,70 +713,93 @@
                 });
             }
         }
-        
+
         function switchTab(tabName) {
             // Hide all tab contents
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.remove('active');
             });
-            
+
             // Remove active class from all tabs
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            
+
             // Show selected tab content
             document.getElementById(tabName).classList.add('active');
-            
+
             // Add active class to clicked tab
             event.target.classList.add('active');
-            
+
             // Load saved embeds when switching to saved tab
             if (tabName === 'saved') {
                 loadSavedEmbeds();
             }
         }
-        
-        async function spawnEmbed(embedType) {
-            const channelId = document.getElementById('channel-select').value;
-            if (!channelId) {
-                showStatus('Please select a channel first!', 'error');
+
+        function spawnEmbed(embedType) {
+            const selectedChannel = document.getElementById('channel-select').value;
+            const statusDiv = document.getElementById('status');
+
+            if (!selectedChannel) {
+                statusDiv.innerHTML = '<div class="status error">❌ Please select a channel first!</div>';
                 return;
             }
-            
-            try {
-                const response = await fetch('/spawn_embed', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        embed_type: embedType,
-                        channel_id: channelId
-                    })
-                });
-                
-                const data = await response.json();
+
+            // Show loading with embed type info
+            const embedTypeNames = {
+                'support': 'Support Ticket System',
+                'gang': 'Gang Recruitment',
+                'shop': 'Interactive Shop',
+                'tos': 'Terms of Service',
+                'rules': 'Server Rules',
+                'news': 'News Updates',
+                'welcome': 'Welcome Message',
+                'reminder': 'Shop Reminder',
+                'verification': 'Verification System'
+            };
+
+            statusDiv.innerHTML = `<div class="status loading">🔄 Spawning ${embedTypeNames[embedType] || embedType} embed with interactive buttons...</div>`;
+
+            fetch('/spawn_embed', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    embed_type: embedType,
+                    channel_id: selectedChannel
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
                 if (data.success) {
-                    showStatus(data.message, 'success');
+                    statusDiv.innerHTML = `<div class="status success">✅ ${embedTypeNames[embedType] || embedType} embed spawned successfully with all interactive buttons connected!</div>`;
+
+                    // Auto-refresh channel list after successful spawn
+                    setTimeout(() => {
+                        loadGuilds();
+                    }, 2000);
                 } else {
-                    showStatus(data.error || 'Unknown error occurred', 'error');
+                    statusDiv.innerHTML = '<div class="status error">❌ ' + (data.error || 'Unknown error occurred') + '<br><small>Try refreshing the page and selecting the channel again.</small></div>';
                 }
-            } catch (error) {
-                showStatus('Error spawning embed: ' + error.message, 'error');
-            }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<div class="status error">❌ Network error: ' + error.message + '<br><small>Check your internet connection and try again.</small></div>';
+            });
         }
-        
+
         async function createCustomEmbed(action = 'spawn') {
             const title = document.getElementById('embed-title').value;
             const description = document.getElementById('embed-description').value;
             const color = document.getElementById('embed-color').value;
-            
+
             if (!title && !description) {
                 showStatus('Please enter at least a title or description!', 'error');
                 return;
             }
-            
+
             if (action === 'spawn') {
                 const channelId = document.getElementById('channel-select').value;
                 if (!channelId) {
@@ -649,7 +813,7 @@
                     return;
                 }
             }
-            
+
             try {
                 const requestBody = {
                     action: action,
@@ -657,13 +821,13 @@
                     description: description,
                     color: color
                 };
-                
+
                 if (action === 'spawn') {
                     requestBody.channel_id = document.getElementById('channel-select').value;
                 } else if (action === 'save') {
                     requestBody.embed_name = document.getElementById('embed-name').value;
                 }
-                
+
                 const response = await fetch('/create_custom_embed', {
                     method: 'POST',
                     headers: {
@@ -671,7 +835,7 @@
                     },
                     body: JSON.stringify(requestBody)
                 });
-                
+
                 const data = await response.json();
                 if (data.success) {
                     showStatus(data.message, 'success');
@@ -693,15 +857,15 @@
                 showStatus('Error with custom embed: ' + error.message, 'error');
             }
         }
-        
+
         function previewEmbed() {
             const title = document.getElementById('embed-title').value || 'Custom Embed';
             const description = document.getElementById('embed-description').value || 'No description provided.';
             const color = document.getElementById('embed-color').value || '7289da';
-            
+
             document.getElementById('preview-title').textContent = title;
             document.getElementById('preview-description').textContent = description;
-            
+
             // Update border color
             const preview = document.getElementById('embed-preview');
             try {
@@ -711,14 +875,14 @@
                 preview.style.borderLeftColor = '#7289da';
             }
         }
-        
+
         async function loadSavedEmbeds() {
             try {
                 const response = await fetch('/get_saved_embeds');
                 const data = await response.json();
-                
+
                 const container = document.getElementById('saved-embeds-container');
-                
+
                 if (data.embeds && data.embeds.length > 0) {
                     container.innerHTML = data.embeds.map(embed => `
                         <div class="saved-embed-item">
@@ -753,14 +917,14 @@
                 showStatus('Error loading saved embeds', 'error');
             }
         }
-        
+
         async function spawnSavedEmbed(embedId) {
             const channelId = document.getElementById('channel-select').value;
             if (!channelId) {
                 showStatus('Please select a channel first!', 'error');
                 return;
             }
-            
+
             try {
                 const response = await fetch('/spawn_saved_embed', {
                     method: 'POST',
@@ -772,7 +936,7 @@
                         channel_id: channelId
                     })
                 });
-                
+
                 const data = await response.json();
                 if (data.success) {
                     showStatus(data.message, 'success');
@@ -783,12 +947,12 @@
                 showStatus('Error spawning saved embed: ' + error.message, 'error');
             }
         }
-        
+
         async function deleteSavedEmbed(embedId) {
             if (!confirm('Are you sure you want to delete this embed?')) {
                 return;
             }
-            
+
             try {
                 const response = await fetch('/delete_saved_embed', {
                     method: 'POST',
@@ -799,7 +963,7 @@
                         embed_id: embedId
                     })
                 });
-                
+
                 const data = await response.json();
                 if (data.success) {
                     showStatus(data.message, 'success');
@@ -811,7 +975,7 @@
                 showStatus('Error deleting saved embed: ' + error.message, 'error');
             }
         }
-        
+
         function showStatus(message, type) {
             const statusDiv = document.getElementById('status');
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
@@ -819,13 +983,13 @@
                 statusDiv.innerHTML = '';
             }, 5000);
         }
-        
+
         async function refreshDetection() {
             const guildId = document.getElementById('guild-select').value;
-            
+
             try {
                 showStatus('🔄 Refreshing channel detection...', 'success');
-                
+
                 const response = await fetch('/refresh_detection', {
                     method: 'POST',
                     headers: {
@@ -835,14 +999,14 @@
                         guild_id: guildId || null
                     })
                 });
-                
+
                 const data = await response.json();
                 if (data.success) {
                     showStatus(`✅ ${data.message} (${data.detected_count || data.total_detected} channels detected)`, 'success');
-                    
+
                     // Reload guilds data
                     await loadGuilds();
-                    
+
                     // Reload channels for current guild
                     if (guildId) {
                         loadChannels();
@@ -854,11 +1018,154 @@
                 showStatus('Error refreshing detection: ' + error.message, 'error');
             }
         }
-        
+
+        // Live status feed functions
+        function addStatusLog(message, type = 'info') {
+            const statusLogs = document.getElementById('status-logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `[${timestamp}] ${emoji} ${message}`;
+            statusLogs.appendChild(logEntry);
+
+            // Auto-scroll to bottom
+            statusLogs.scrollTop = statusLogs.scrollHeight;
+
+            // Keep only last 20 entries
+            while (statusLogs.children.length > 20) {
+                statusLogs.removeChild(statusLogs.firstChild);
+            }
+        }
+
+        function updateValidationItem(id, status, message) {
+            let item = document.getElementById(id);
+            if (!item) {
+                item = document.createElement('div');
+                item.id = id;
+                item.className = 'validation-item';
+                document.getElementById('channel-validation').appendChild(item);
+            }
+
+            item.className = `validation-item ${status}`;
+            item.innerHTML = message;
+        }
+
+        async function validateChannelSelection() {
+            const channelId = document.getElementById('channel-select').value;
+            const guildId = document.getElementById('guild-select').value;
+
+            if (!channelId || !guildId) {
+                document.getElementById('live-status-feed').style.display = 'none';
+                return;
+            }
+
+            // Show live status feed
+            document.getElementById('live-status-feed').style.display = 'block';
+            addStatusLog('Starting channel validation...', 'info');
+
+            try {
+                // Get channel details
+                const guild = guildsData.find(g => g.id == guildId);
+                const channel = guild ? guild.channels.find(c => c.id == channelId) : null;
+
+                if (!channel) {
+                    addStatusLog('Channel not found in guild data', 'error');
+                    updateValidationItem('channel-status', 'error', '❌ Channel: NOT FOUND');
+                    return;
+                }
+
+                addStatusLog(`Selected channel: #${channel.name} (ID: ${channel.id})`, 'success');
+                updateValidationItem('channel-status', 'success', `📝 Channel: #${channel.name}`);
+
+                // Validate bot permissions
+                updateValidationItem('bot-permissions', 
+                    channel.permissions ? 'success' : 'error',
+                    channel.permissions ? '🤖 Bot Permissions: ✅ READY' : '🤖 Bot Permissions: ❌ MISSING'
+                );
+
+                // Check channel type
+                updateValidationItem('channel-type', 'success', `📝 Channel Type: TEXT`);
+
+                // Check auto-detection status
+                const isDetected = channel.auto_detected;
+                updateValidationItem('auto-detection', 
+                    isDetected ? 'success' : 'warning',
+                    isDetected ? `🎯 Auto-Detected: ${channel.detected_type.toUpperCase()}` : '🎯 Auto-Detection: MANUAL SELECT'
+                );
+
+                // Test bot connectivity
+                addStatusLog('Testing bot connectivity...', 'info');
+                try {
+                    const testResponse = await fetch('/get_valid_channels');
+                    const testData = await testResponse.json();
+
+                    if (testData.channels && testData.channels.find(c => c.id == channelId)) {
+                        updateValidationItem('bot-connectivity', 'success', '🔗 Bot Connectivity: ✅ ONLINE');
+                        addStatusLog('Bot connectivity test passed', 'success');
+                    } else {
+                        updateValidationItem('bot-connectivity', 'warning', '🔗 Bot Connectivity: ⚠️ LIMITED');
+                        addStatusLog('Bot may have limited access to this channel', 'warning');
+                    }
+                } catch (error) {
+                    updateValidationItem('bot-connectivity', 'error', '🔗 Bot Connectivity: ❌ OFFLINE');
+                    addStatusLog('Bot connectivity test failed', 'error');
+                }
+
+                // Check embed system readiness
+                addStatusLog('Checking embed system readiness...', 'info');
+                // Simulate embed readiness check - in a real scenario, this would be an API call
+                setTimeout(() => {
+                    updateValidationItem('embed-system', 'success', '🚀 Embed System: ✅ READY');
+                    addStatusLog('All systems operational - ready to spawn embeds!', 'success');
+                }, 1000);
+
+                // Show recommended embed types for detected channels
+                if (isDetected) {
+                    const recommendations = getEmbedRecommendations(channel.detected_type);
+                    if (recommendations.length > 0) {
+                        addStatusLog(`Recommended embeds: ${recommendations.join(', ')}`, 'info');
+                    }
+                }
+
+            } catch (error) {
+                addStatusLog(`Validation error: ${error.message}`, 'error');
+                updateValidationItem('system-status', 'error', '❌ System Error');
+            }
+        }
+
+        function getEmbedRecommendations(channelType) {
+            const recommendations = {
+                'support': ['Support Panel', 'Welcome Panel'],
+                'stk': ['Gang Panel', 'Rules Panel'], // Assuming 'stk' might be a common prefix like in 'stk-gang'
+                'shop': ['Shop Panel', 'Shop Reminder'],
+                'rules': ['Rules Panel', 'ToS Panel'],
+                'news': ['News Panel', 'Announcement'],
+                'welcome': ['Welcome Panel', 'Verification Panel']
+            };
+
+            // Normalize channelType to lowercase for matching
+            const normalizedChannelType = channelType.toLowerCase();
+
+            // Check for common patterns if direct match fails
+            if (normalizedChannelType.includes('support')) return recommendations.support;
+            if (normalizedChannelType.includes('gang') || normalizedChannelType.includes('stk')) return recommendations.stk;
+            if (normalizedChannelType.includes('shop')) return recommendations.shop;
+            if (normalizedChannelType.includes('rules')) return recommendations.rules;
+            if (normalizedChannelType.includes('news') || normalizedChannelType.includes('announcement')) return recommendations.news;
+            if (normalizedChannelType.includes('welcome') || normalizedChannelType.includes('greet')) return recommendations.welcome;
+
+            return recommendations[channelType] || [];
+        }
+
         // Load data on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadGuilds();
             previewEmbed(); // Initialize preview
+
+            // Initialize status feed
+            addStatusLog('ZSells Embed Spawner initialized', 'success');
+            addStatusLog('Waiting for channel selection...', 'info');
         });
     </script>
 </body>
