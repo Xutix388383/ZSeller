@@ -222,70 +222,7 @@ def analyze_guild_structure(guild):
 CHANNELS = {}
 GUILD_ANALYSIS = {}
 
-# Shop reminder task
-@tasks.loop(minutes=15)
-async def send_shop_reminder():
-    """Send shop reminder every 15 minutes and auto-delete duplicates"""
-    try:
-        # Use the specific welcome channel ID
-        welcome_channel_id = 1407347199477547101
-        welcome_channel = bot.get_channel(welcome_channel_id)
-
-        # If specific channel not found, try to find one
-        if not welcome_channel:
-            for guild in bot.guilds:
-                for channel in guild.text_channels:
-                    channel_name_lower = channel.name.lower()
-                    if any(pattern in channel_name_lower for pattern in ['welcome', 'general', 'main', 'lobby']):
-                        welcome_channel = channel
-                        break
-                if welcome_channel:
-                    break
-
-        # Send reminder and handle duplicate deletion
-        if welcome_channel and check_channel_permissions(welcome_channel):
-            # Delete old shop reminder messages to prevent spam (limited to prevent rate limiting)
-            try:
-                deleted_count = 0
-                async for message in welcome_channel.history(limit=10):  # Reduced from 50 to 10
-                    if (message.author == bot.user and 
-                        message.embeds and 
-                        len(message.embeds) > 0 and
-                        "Shop Reminder" in str(message.embeds[0].title)):
-                        await message.delete()
-                        deleted_count += 1
-                        print(f"🗑️ Deleted old shop reminder message ({deleted_count})")
-
-                        # Add delay to prevent rate limiting
-                        if deleted_count >= 3:  # Stop after 3 deletions to prevent rate limiting
-                            break
-                        await asyncio.sleep(1)  # 1 second delay between deletions
-
-            except discord.Forbidden:
-                print("⚠️ No permission to delete old messages")
-            except discord.HTTPException as e:
-                if e.status == 429:  # Rate limited
-                    print("⚠️ Rate limited while deleting messages, skipping cleanup")
-                else:
-                    print(f"⚠️ HTTP error deleting messages: {e}")
-            except Exception as e:
-                print(f"⚠️ Error deleting old messages: {e}")
-
-            # Send new reminder message
-            embed = create_reminder_embed()
-            await welcome_channel.send(embed=embed)
-            print(f"✅ Shop reminder sent to #{welcome_channel.name}")
-        elif welcome_channel:
-            print(f"❌ No permission to send shop reminder in #{welcome_channel.name}")
-        else:
-            print("⚠️ No welcome channel found. Create a channel with 'welcome', 'general', or 'main' in the name.")
-
-    except Exception as e:
-        print(f"Error sending shop reminder: {e}")
-
-@send_shop_reminder.before_loop
-async def before_shop_reminder():
-    await bot.wait_until_ready()
+# Shop reminder task removed - can be spawned manually through admin panel
 
 # Role IDs
 STAFF_ROLE_ID = 1407347171795406919  # Admin role
@@ -1228,10 +1165,7 @@ async def on_ready():
     except Exception as e:
         print(f'❌ Failed to sync commands: {e}')
 
-    # Start the shop reminder task
-    if not send_shop_reminder.is_running():
-        send_shop_reminder.start()
-        print("✅ Shop reminder task started (every 15 minutes)")
+    # Shop reminder task removed - can be spawned manually through admin panel
 
     print(f'\n🎉 {bot.user} is fully operational with enhanced detection!')
     print('💡 Use /spawner for embed spawning panel')
