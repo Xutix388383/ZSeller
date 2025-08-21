@@ -191,30 +191,50 @@ def analyze_guild_structure(guild):
     if not guild:
         return {}
 
-    analysis = {
-        'guild_info': {
-            'name': guild.name,
-            'id': guild.id,
-            'member_count': guild.member_count,
-            'created_at': guild.created_at.isoformat() if guild.created_at else None,
-            'verification_level': str(guild.verification_level),
-            'boost_count': guild.premium_subscription_count,
-            'boost_tier': guild.premium_tier
-        },
-        'channels': {
-            'total_text': len(guild.text_channels),
-            'total_voice': len(guild.voice_channels),
-            'total_categories': len(guild.categories),
-            'detected_channels': get_channels_by_name(guild)
-        },
-        'roles': {
-            'total_roles': len(guild.roles),
-            'role_hierarchy': [{'name': role.name, 'members': len(role.members), 'permissions': len([p for p, v in role.permissions if v])} 
-                             for role in sorted(guild.roles, key=lambda r: r.position, reverse=True)[:10]]
-        },
-        'members': get_key_members(guild),
-        'features': guild.features
-    }
+    try:
+        analysis = {
+            'guild_info': {
+                'name': guild.name,
+                'id': guild.id,
+                'member_count': guild.member_count,
+                'created_at': guild.created_at.isoformat() if guild.created_at else None,
+                'verification_level': str(guild.verification_level),
+                'boost_count': guild.premium_subscription_count or 0,
+                'boost_tier': guild.premium_tier or 0,
+                'features': list(guild.features) if hasattr(guild, 'features') and guild.features else []
+            },
+            'channels': {
+                'total_text': len(guild.text_channels),
+                'total_voice': len(guild.voice_channels),
+                'total_categories': len(guild.categories),
+                'detected_channels': get_channels_by_name(guild)
+            },
+            'roles': {
+                'total_roles': len(guild.roles),
+                'role_hierarchy': [{'name': role.name, 'members': len(role.members), 'permissions': len([p for p, v in role.permissions if v])} 
+                                 for role in sorted(guild.roles, key=lambda r: r.position, reverse=True)[:10]]
+            },
+            'members': get_key_members(guild)
+        }
+    except Exception as analysis_error:
+        print(f"⚠️ Error in guild analysis: {analysis_error}")
+        # Return minimal analysis on error
+        analysis = {
+            'guild_info': {
+                'name': guild.name,
+                'id': guild.id,
+                'member_count': guild.member_count,
+                'features': []
+            },
+            'channels': {
+                'total_text': len(guild.text_channels),
+                'total_voice': len(guild.voice_channels),
+                'total_categories': len(guild.categories),
+                'detected_channels': get_channels_by_name(guild)
+            },
+            'roles': {'total_roles': len(guild.roles), 'role_hierarchy': []},
+            'members': {'owner': None, 'admins': [], 'moderators': [], 'staff': [], 'bots': [], 'active_members': [], 'new_members': []}
+        }
 
     return analysis
 
@@ -534,9 +554,9 @@ class MoneyView(discord.ui.View):
         view = OrderInfoView()
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
+    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
+        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
 
 class WatchesView(discord.ui.View):
     def __init__(self):
@@ -556,17 +576,17 @@ class WatchesView(discord.ui.View):
         view = OrderInfoView()
         await interaction.response.edit_message(embed=embed, view=view)
 
-    @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
+    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
+        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
 
 class ContactView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
 
-    @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
+    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
+        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
 
 class OrderInfoView(discord.ui.View):
     def __init__(self):
@@ -575,6 +595,217 @@ class OrderInfoView(discord.ui.View):
     @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.primary, emoji='🏠')
     async def back_to_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
+
+# NEW SHOP LOGIC START
+# Placeholder functions for new shop logic
+def create_shop_selection_embed():
+    embed = discord.Embed(
+        title="🛒 ZSupply - Choose Your Location",
+        description="Select a shop location to browse products:",
+        color=0x3498db,
+        timestamp=datetime.now()
+    )
+    embed.add_field(
+        name="📍 Locations",
+        value="• The Bronx 3\n• Philly Streets 2\n• South Bronx The Trenches",
+        inline=False
+    )
+    embed.add_field(
+        name="🎮 Roblox Services",
+        value="• Roblox Alts Shop - Premium aged accounts",
+        inline=False
+    )
+    embed.set_footer(text="ZSupply • Select a location to proceed")
+    return embed
+
+class ShopSelectionView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label='The Bronx 3', style=discord.ButtonStyle.primary, emoji='🗽')
+    async def bronx3_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Logic for Bronx 3 shop
+        await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView()) # Revert to original shop for now
+
+    @discord.ui.button(label='Philly Streets 2', style=discord.ButtonStyle.success, emoji='🦅')
+    async def philly_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Logic for Philly Streets 2 shop
+        await interaction.response.send_message("Philly Streets 2 shop not yet implemented!", ephemeral=True)
+
+    @discord.ui.button(label='South Bronx The Trenches', style=discord.ButtonStyle.danger, emoji='🔥')
+    async def south_bronx_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Logic for South Bronx The Trenches shop
+        await interaction.response.send_message("South Bronx The Trenches shop not yet implemented!", ephemeral=True)
+
+    @discord.ui.button(label='Roblox Alts Shop', style=discord.ButtonStyle.secondary, emoji='🎮')
+    async def roblox_alts_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Logic for Roblox Alts shop
+        await interaction.response.edit_message(embed=create_roblox_alts_embed(), view=RobloxAltsView())
+
+# ROBLOX ALTS SHOP LOGIC START
+def create_roblox_alts_embed():
+    embed = discord.Embed(
+        title="🎮 Roblox Alts Shop - Premium Aged Accounts",
+        description="**Premium Roblox Accounts - 200+ Days Old**\n\nAll accounts come fully modded for your chosen game!",
+        color=0xff6b6b,
+        timestamp=datetime.now()
+    )
+    embed.add_field(
+        name="🔥 Account Features",
+        value="✅ **200+ Days Old** - Trusted & Aged\n✅ **Fully Modded** - Game-ready setup\n✅ **Premium Quality** - Hand-picked accounts\n✅ **Instant Delivery** - Fast & reliable",
+        inline=False
+    )
+    embed.add_field(
+        name="💰 Pricing",
+        value="**$3.00 per account**\nIncludes full mod setup for your game!",
+        inline=True
+    )
+    embed.add_field(
+        name="🎯 Available Games",
+        value="• The Bronx 3 (TB3)\n• Philly Streets 2\n• South Bronx The Trenches",
+        inline=True
+    )
+    embed.add_field(
+        name="📦 What's Included",
+        value="🔸 200+ day old Roblox account\n🔸 Full game mods installed\n🔸 Account credentials\n🔸 Setup instructions\n🔸 24/7 support",
+        inline=False
+    )
+    embed.set_footer(text="ZSupply Roblox Alts • Select your game below")
+    return embed
+
+class RobloxAltsView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label='TB3 Modded Account', style=discord.ButtonStyle.primary, emoji='🗽')
+    async def tb3_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_roblox_account_info_embed("The Bronx 3 (TB3)"), view=RobloxOrderView("TB3"))
+
+    @discord.ui.button(label='Philly Streets 2 Account', style=discord.ButtonStyle.success, emoji='🦅')
+    async def philly_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_roblox_account_info_embed("Philly Streets 2"), view=RobloxOrderView("Philly"))
+
+    @discord.ui.button(label='South Bronx Account', style=discord.ButtonStyle.danger, emoji='🔥')
+    async def south_bronx_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_roblox_account_info_embed("South Bronx The Trenches"), view=RobloxOrderView("South Bronx"))
+
+    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
+    async def back_to_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+
+def create_roblox_account_info_embed(game_name):
+    embed = discord.Embed(
+        title=f"🎮 {game_name} - Modded Account",
+        description=f"**Premium Roblox Account for {game_name}**\n\nReady to dominate with full mods installed!",
+        color=0x7289da,
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(
+        name="🔥 Account Specifications",
+        value=f"**Age:** 200+ Days Old\n**Game:** {game_name}\n**Status:** Fully Modded\n**Price:** $3.00",
+        inline=True
+    )
+
+    embed.add_field(
+        name="⚡ Mods Included",
+        value="🔸 Speed Hack\n🔸 Jump Boost\n🔸 No Clip\n🔸 ESP (Players)\n🔸 Auto-Farm\n🔸 God Mode",
+        inline=True
+    )
+
+    embed.add_field(
+        name="📦 What You Get",
+        value="✅ Account Username & Password\n✅ Pre-installed mods\n✅ Setup guide\n✅ Backup email access\n✅ 24/7 customer support",
+        inline=False
+    )
+
+    embed.add_field(
+        name="⚠️ Important Notes",
+        value="• Use at your own risk\n• Account age guaranteed 200+ days\n• Mods pre-configured and tested\n• Instant delivery after payment",
+        inline=False
+    )
+
+    embed.set_footer(text="ZSupply • {game_name} Modded Account • Premium Quality")
+    return embed
+
+class RobloxOrderView(discord.ui.View):
+    def __init__(self, game_type):
+        super().__init__(timeout=300)
+        self.game_type = game_type
+
+    @discord.ui.button(label='Order Now - $3.00', style=discord.ButtonStyle.success, emoji='💳')
+    async def order_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_roblox_order_info_embed(self.game_type), view=RobloxContactView())
+
+    @discord.ui.button(label='Back to Roblox Shop', style=discord.ButtonStyle.secondary, emoji='🎮')
+    async def back_to_roblox_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_roblox_alts_embed(), view=RobloxAltsView())
+
+    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
+    async def back_to_main_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+
+def create_roblox_order_info_embed(game_type):
+    game_names = {
+        "TB3": "The Bronx 3",
+        "Philly": "Philly Streets 2", 
+        "South Bronx": "South Bronx The Trenches"
+    }
+
+    game_name = game_names.get(game_type, game_type)
+
+    embed = discord.Embed(
+        title="📋 Roblox Account Order Information",
+        description="**Ready to complete your order?**",
+        color=0x00ff00,
+        timestamp=datetime.now()
+    )
+
+    embed.add_field(
+        name="🎮 Order Details",
+        value=f"**Product:** Modded Roblox Account\n**Game:** {game_name}\n**Age:** 200+ Days\n**Price:** $3.00",
+        inline=False
+    )
+
+    embed.add_field(
+        name="📞 Contact to Order",
+        value="**Contact:** zpofe\n**Response Time:** Instant",
+        inline=True
+    )
+
+    embed.add_field(
+        name="💳 Payment Methods", 
+        value="• CashApp\n• Apple Pay",
+        inline=True
+    )
+
+    embed.add_field(
+        name="⚡ Delivery Process",
+        value="1️⃣ Contact us with your order\n2️⃣ Complete payment ($3.00)\n3️⃣ Receive account credentials\n4️⃣ Get setup instructions\n5️⃣ Start dominating the game!",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🛡️ Guarantees",
+        value="✅ Account age 200+ days verified\n✅ All mods pre-installed & tested\n✅ Full account access provided\n✅ 24/7 customer support",
+        inline=False
+    )
+
+    embed.set_footer(text="ZSupply • Contact us to complete your order!")
+    return embed
+
+class RobloxContactView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label='Back to Roblox Shop', style=discord.ButtonStyle.primary, emoji='🎮')
+    async def back_to_roblox_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_roblox_alts_embed(), view=RobloxAltsView())
+
+    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
+    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+# END ROBLOX ALTS SHOP LOGIC
 
 # New embed creation functions
 def create_support_embed():
@@ -1167,8 +1398,7 @@ async def on_ready():
 
     # Shop reminder task removed - can be spawned manually through admin panel
 
-    print(f'\n🎉 {bot.user} is fully operational with enhanced detection!')
-    print('💡 Use /spawner for embed spawning panel')
+    print('\n💡 Use /spawner for embed spawning panel')
     print('🔧 Use /admin for advanced admin panel')
     print('🔍 Use /guild_info to view detailed analysis')
 
@@ -1974,13 +2204,6 @@ class ChannelSelectView(discord.ui.View):
         self.guild = guild
         self.add_channel_select()
 
-# Second Admin Panel Classes
-class ChannelSelectView2(discord.ui.View):
-    def __init__(self, guild):
-        super().__init__(timeout=600)  # Extended timeout to 10 minutes
-        self.guild = guild
-        self.add_channel_select()
-
     def add_channel_select(self):
         # Create options for detected channels
         options = []
@@ -2090,6 +2313,13 @@ class ChannelSelectView2(discord.ui.View):
             except:
                 pass
 
+# Second Admin Panel Classes
+class ChannelSelectView2(discord.ui.View):
+    def __init__(self, guild):
+        super().__init__(timeout=600)  # Extended timeout to 10 minutes
+        self.guild = guild
+        self.add_channel_select()
+
     def add_channel_select(self):
         # Create options for detected channels
         options = []
@@ -2181,8 +2411,8 @@ class ChannelSelectView2(discord.ui.View):
                 return
 
             # Show the enhanced admin control panel
-            embed = create_admin_control_embed(target_channel)
-            view = AdminControlView(target_channel)
+            embed = create_admin_control_2_embed(target_channel)
+            view = AdminControlView2(target_channel)
             try:
                 await interaction.response.edit_message(embed=embed, view=view)
             except discord.InteractionResponded:
@@ -2245,10 +2475,11 @@ class AdminControlView(discord.ui.View):
             await interaction.response.send_message(f"❌ Bot lacks permissions in {self.target_channel.mention}.", ephemeral=True)
             return
         try:
-            embed = create_main_shop_embed()
-            view = MainShopView()
+            # This is where the original change is applied, calling the new shop selection embed
+            embed = create_shop_selection_embed()
+            view = ShopSelectionView()
             await self.target_channel.send(embed=embed, view=view)
-            await interaction.response.send_message(f"✅ Shop panel spawned in {self.target_channel.mention}!", ephemeral=True)
+            await interaction.response.send_message(f"✅ Shop selection panel spawned in {self.target_channel.mention}!", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
@@ -2350,7 +2581,7 @@ class AdminControlView(discord.ui.View):
                 inline=False
             )
             embed.set_footer(text="ZSells Verification System • Keep the server secure")
-            
+
             view = VerificationView()
             await self.target_channel.send(embed=embed, view=view)
             await interaction.response.send_message(f"✅ Verification panel spawned in {self.target_channel.mention}!", ephemeral=True)
@@ -2437,149 +2668,235 @@ class AdminControlView(discord.ui.View):
         embed = discord.Embed(title="✅ Admin Panel Closed", description="Admin panel has been closed.", color=0x95a5a6)
         await interaction.response.edit_message(embed=embed, view=None)
 
-# Second Admin Control View with Additional Tools
 class AdminControlView2(discord.ui.View):
     def __init__(self, target_channel):
-        super().__init__(timeout=600)
+        super().__init__(timeout=600)  # Extended timeout to 10 minutes
         self.target_channel = target_channel
+        self.add_channel_select()
 
-    @discord.ui.button(label='Mass Mention', style=discord.ButtonStyle.primary, emoji='📢', row=0)
-    async def mass_mention(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = MassMentionModal(self.target_channel)
-        await interaction.response.send_modal(modal)
+    def add_channel_select(self):
+        # Create options for detected channels
+        options = []
 
-    @discord.ui.button(label='Channel Lock', style=discord.ButtonStyle.danger, emoji='🔒', row=0)
-    async def lock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        try:
-            # Remove send_messages permission for @everyone
-            await self.target_channel.set_permissions(interaction.guild.default_role, send_messages=False)
-            embed = discord.Embed(title="🔒 Channel Locked", description=f"#{self.target_channel.name} has been locked.", color=0xff0000)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Error locking channel: {str(e)}", ephemeral=True)
+        # Add current channel option
+        options.append(discord.SelectOption(label="Current Channel", value="current", emoji="📍"))
 
-    @discord.ui.button(label='Channel Unlock', style=discord.ButtonStyle.success, emoji='🔓', row=0)
-    async def unlock_channel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        try:
-            # Restore send_messages permission for @everyone
-            await self.target_channel.set_permissions(interaction.guild.default_role, send_messages=True)
-            embed = discord.Embed(title="🔓 Channel Unlocked", description=f"#{self.target_channel.name} has been unlocked.", color=0x00ff00)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Error unlocking channel: {str(e)}", ephemeral=True)
+        # Add detected channels
+        channel_emojis = {
+            'support': '🎫',
+            'stk': '⚔️', 
+            'tos': '📋',
+            'rules': '📜',
+            'news': '📰'
+        }
 
-    @discord.ui.button(label='Slowmode', style=discord.ButtonStyle.secondary, emoji='⏱️', row=0)
-    async def set_slowmode(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = SlowmodeModal(self.target_channel)
-        await interaction.response.send_modal(modal)
+        for channel_type, channel_id in CHANNELS.items():
+            channel = self.guild.get_channel(channel_id) if self.guild else bot.get_channel(channel_id)
+            if channel:
+                emoji = channel_emojis.get(channel_type, '📢')
+                label = f"#{channel.name}"
+                options.append(discord.SelectOption(
+                    label=label,
+                    value=channel_type,
+                    emoji=emoji,
+                    description=f"{channel_type.title()} channel"
+                ))
 
-    @discord.ui.button(label='Poll Creator', style=discord.ButtonStyle.primary, emoji='📊', row=0)
-    async def create_poll(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = PollModal(self.target_channel)
-        await interaction.response.send_modal(modal)
+        # Add all other text channels in the guild
+        if self.guild:
+            other_channels = [ch for ch in self.guild.text_channels 
+                           if ch.id not in CHANNELS.values()][:15]  # Limit to 15 to avoid Discord limits
 
-    @discord.ui.button(label='Role Manager', style=discord.ButtonStyle.primary, emoji='🎭', row=1)
-    async def role_manager(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = RoleManagerModal(interaction.guild)
-        await interaction.response.send_modal(modal)
+            for channel in other_channels:
+                if len(options) < 25:  # Discord limit
+                    options.append(discord.SelectOption(
+                        label=f"#{channel.name}",
+                        value=f"other_{channel.id}",
+                        emoji="📝",
+                        description="Other channel"
+                    ))
 
-    @discord.ui.button(label='Warn All', style=discord.ButtonStyle.danger, emoji='⚠️', row=1)
-    async def warn_all(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = WarnAllModal(interaction.guild)
-        await interaction.response.send_modal(modal)
+        if not options:
+            options.append(discord.SelectOption(label="No channels available", value="none", emoji="❌"))
 
-    @discord.ui.button(label='Server Stats', style=discord.ButtonStyle.secondary, emoji='📈', row=1)
-    async def server_stats(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        embed = create_server_stats_embed(interaction.guild)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label='Auto Mod', style=discord.ButtonStyle.danger, emoji='🤖', row=1)
-    async def auto_mod_config(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        embed = create_automod_embed()
-        view = AutoModView(self.target_channel)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label='Scheduled Message', style=discord.ButtonStyle.primary, emoji='⏰', row=2)
-    async def scheduled_message(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = ScheduledMessageModal(self.target_channel)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label='Member Search', style=discord.ButtonStyle.secondary, emoji='🔍', row=2)
-    async def member_search(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        modal = MemberSearchModal(interaction.guild)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label='Backup Server', style=discord.ButtonStyle.secondary, emoji='💾', row=2)
-    async def backup_server(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        await interaction.response.defer(ephemeral=True)
-        backup_data = await create_server_backup(interaction.guild)
-        embed = discord.Embed(
-            title="💾 Server Backup Created",
-            description=f"Backup completed for **{interaction.guild.name}**\n\n**Channels:** {backup_data['channels']}\n**Roles:** {backup_data['roles']}\n**Members:** {backup_data['members']}",
-            color=0x00ff00
+        select = discord.ui.Select(
+            placeholder="Select a channel to spawn embeds in...",
+            options=options[:25]  # Discord limit
         )
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        select.callback = self.channel_select
+        self.add_item(select)
 
-    @discord.ui.button(label='Activity Monitor', style=discord.ButtonStyle.primary, emoji='📊', row=2)
-    async def activity_monitor(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        embed = create_activity_monitor_embed(interaction.guild)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    async def channel_select(self, interaction: discord.Interaction):
+        try:
+            # Check if interaction is still valid
+            if interaction.response.is_done():
+                return
 
-    @discord.ui.button(label='Switch to Admin 1', style=discord.ButtonStyle.secondary, emoji='🔄', row=3)
-    async def switch_to_admin1(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        embed = create_admin_control_embed(self.target_channel)
-        view = AdminControlView(self.target_channel)
-        await interaction.response.edit_message(embed=embed, view=view)
+            # Check if user is authorized
+            if interaction.user.id != AUTHORIZED_USER_ID:
+                try:
+                    await interaction.response.send_message("❌ You are not authorized to use this dropdown.", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
 
-    @discord.ui.button(label='Close Panel', style=discord.ButtonStyle.danger, emoji='❌', row=3)
-    async def close_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not has_admin_permissions(interaction.user, interaction.guild):
-            await interaction.response.send_message("❌ You are not authorized to use this button.", ephemeral=True)
-            return
-        embed = discord.Embed(title="✅ Admin Panel 2 Closed", description="Secondary admin panel has been closed.", color=0x95a5a6)
-        await interaction.response.edit_message(embed=embed, view=None)
+            selected_value = interaction.data['values'][0]
+
+            # Get the target channel
+            if selected_value == "current":
+                target_channel = interaction.channel
+            elif selected_value == "none":
+                try:
+                    await interaction.response.send_message("❌ No channels available!", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+            elif selected_value.startswith("other_"):
+                channel_id = int(selected_value.replace("other_", ""))
+                target_channel = bot.get_channel(channel_id)
+            else:
+                target_channel = bot.get_channel(CHANNELS.get(selected_value))
+
+            if not target_channel:
+                try:
+                    await interaction.response.send_message("❌ Selected channel not found!", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+
+            # Show the enhanced admin control panel
+            embed = create_admin_control_2_embed(target_channel)
+            view = AdminControlView2(target_channel)
+            try:
+                await interaction.response.edit_message(embed=embed, view=view)
+            except discord.InteractionResponded:
+                await interaction.edit_original_response(embed=embed, view=view)
+        except discord.NotFound:
+            print("⚠️ Channel select interaction expired")
+        except discord.InteractionResponded:
+            print("⚠️ Interaction already responded to")
+        except Exception as e:
+            print(f"⚠️ Error in channel select: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred. Please try again.", ephemeral=True)
+            except:
+                pass
+
+class AdminControlView2(discord.ui.View):
+    def __init__(self, target_channel):
+        super().__init__(timeout=600)  # Extended timeout to 10 minutes
+        self.target_channel = target_channel
+        self.add_channel_select()
+
+    def add_channel_select(self):
+        # Create options for detected channels
+        options = []
+
+        # Add current channel option
+        options.append(discord.SelectOption(label="Current Channel", value="current", emoji="📍"))
+
+        # Add detected channels
+        channel_emojis = {
+            'support': '🎫',
+            'stk': '⚔️', 
+            'tos': '📋',
+            'rules': '📜',
+            'news': '📰'
+        }
+
+        for channel_type, channel_id in CHANNELS.items():
+            channel = self.guild.get_channel(channel_id) if self.guild else bot.get_channel(channel_id)
+            if channel:
+                emoji = channel_emojis.get(channel_type, '📢')
+                label = f"#{channel.name}"
+                options.append(discord.SelectOption(
+                    label=label,
+                    value=channel_type,
+                    emoji=emoji,
+                    description=f"{channel_type.title()} channel"
+                ))
+
+        # Add all other text channels in the guild
+        if self.guild:
+            other_channels = [ch for ch in self.guild.text_channels 
+                           if ch.id not in CHANNELS.values()][:15]  # Limit to 15 to avoid Discord limits
+
+            for channel in other_channels:
+                if len(options) < 25:  # Discord limit
+                    options.append(discord.SelectOption(
+                        label=f"#{channel.name}",
+                        value=f"other_{channel.id}",
+                        emoji="📝",
+                        description="Other channel"
+                    ))
+
+        if not options:
+            options.append(discord.SelectOption(label="No channels available", value="none", emoji="❌"))
+
+        select = discord.ui.Select(
+            placeholder="Select a channel to spawn embeds in...",
+            options=options[:25]  # Discord limit
+        )
+        select.callback = self.channel_select
+        self.add_item(select)
+
+    async def channel_select(self, interaction: discord.Interaction):
+        try:
+            # Check if interaction is still valid
+            if interaction.response.is_done():
+                return
+
+            # Check if user is authorized
+            if interaction.user.id != AUTHORIZED_USER_ID:
+                try:
+                    await interaction.response.send_message("❌ You are not authorized to use this dropdown.", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+
+            selected_value = interaction.data['values'][0]
+
+            # Get the target channel
+            if selected_value == "current":
+                target_channel = interaction.channel
+            elif selected_value == "none":
+                try:
+                    await interaction.response.send_message("❌ No channels available!", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+            elif selected_value.startswith("other_"):
+                channel_id = int(selected_value.replace("other_", ""))
+                target_channel = bot.get_channel(channel_id)
+            else:
+                target_channel = bot.get_channel(CHANNELS.get(selected_value))
+
+            if not target_channel:
+                try:
+                    await interaction.response.send_message("❌ Selected channel not found!", ephemeral=True)
+                except discord.InteractionResponded:
+                    pass
+                return
+
+            # Show the enhanced admin control panel
+            embed = create_admin_control_2_embed(target_channel)
+            view = AdminControlView2(target_channel)
+            try:
+                await interaction.response.edit_message(embed=embed, view=view)
+            except discord.InteractionResponded:
+                await interaction.edit_original_response(embed=embed, view=view)
+        except discord.NotFound:
+            print("⚠️ Channel select interaction expired")
+        except discord.InteractionResponded:
+            print("⚠️ Interaction already responded to")
+        except Exception as e:
+            print(f"⚠️ Error in channel select: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred. Please try again.", ephemeral=True)
+            except:
+                pass
 
 # Admin Panel Embed Functions
 def create_admin_panel_embed():
@@ -2668,7 +2985,7 @@ def create_admin_panel_2_embed():
 
     embed.add_field(
         name="🔧 **Available Modules**",
-        value="```\n🔒 Channel Control     📊 Analytics\n⚠️ Mass Moderation    🎭 Role Management\n⏰ Scheduling         🔍 Advanced Search\n💾 Backup Systems     📈 Activity Tracking\n```",
+        value="```yaml\n🔒 Channel Control     📊 Analytics\n⚠️ Mass Moderation    🎭 Role Management\n⏰ Scheduling         🔍 Advanced Search\n💾 Backup Systems     📈 Activity Tracking\n```",
         inline=True
     )
 
@@ -2680,7 +2997,7 @@ def create_admin_panel_2_embed():
 
     embed.add_field(
         name="🎯 **Quick Access**",
-        value="```\n📢 Mass Mention System\n🔒 Channel Lock/Unlock\n⏱️ Slowmode Controls\n📊 Poll & Survey Tools\n🤖 Auto-Mod Configuration\n💾 Server Backup Tools\n```",
+        value="```yaml\n📢 Mass Mention System\n🔒 Channel Lock/Unlock\n⏱️ Slowmode Controls\n📊 Poll & Survey Tools\n🤖 Auto-Mod Configuration\n💾 Server Backup Tools\n```",
         inline=True
     )
 
@@ -2735,7 +3052,7 @@ def create_admin_control_2_embed(target_channel):
         inline=True
     )
 
-    embed.set_footer(text=f"Advanced C&C • Target: #{target_channel.name} • Extended Operations Active")
+    embed.set_footer(text="C&C Interface • Target: #{target_channel.name} • Extended Operations Active")
     return embed
 
 # Helper Modals for Admin Panel 2
@@ -2764,16 +3081,16 @@ class MassMentionModal(discord.ui.Modal, title='Mass Mention System'):
         try:
             guild = self.target_channel.guild
             role = None
-            
+
             if self.target_role.value:
                 if self.target_role.value.isdigit():
                     role = guild.get_role(int(self.target_role.value))
                 else:
                     role = discord.utils.get(guild.roles, name=self.target_role.value)
-            
+
             mention = role.mention if role else "@everyone"
             message = f"{mention}\n\n{self.message_content.value}"
-            
+
             await self.target_channel.send(message)
             await interaction.response.send_message("✅ Mass mention sent successfully!", ephemeral=True)
         except Exception as e:
@@ -2798,7 +3115,7 @@ class SlowmodeModal(discord.ui.Modal, title='Set Channel Slowmode'):
             if seconds < 0 or seconds > 21600:
                 await interaction.response.send_message("❌ Slowmode must be between 0 and 21600 seconds (6 hours).", ephemeral=True)
                 return
-            
+
             await self.target_channel.edit(slowmode_delay=seconds)
             if seconds == 0:
                 await interaction.response.send_message(f"✅ Slowmode disabled for #{self.target_channel.name}", ephemeral=True)
@@ -2851,7 +3168,7 @@ class PollModal(discord.ui.Modal, title='Create Poll'):
             message = await self.target_channel.send(embed=embed)
             for i in range(len(options)):
                 await message.add_reaction(chr(0x1F1E6 + i))
-            
+
             await interaction.response.send_message("✅ Poll created successfully!", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
@@ -2888,7 +3205,7 @@ class RoleManagerModal(discord.ui.Modal, title='Role Manager'):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             action = self.action.value.lower()
-            
+
             if action == "create":
                 color = discord.Color.default()
                 if self.role_color.value:
@@ -2896,10 +3213,10 @@ class RoleManagerModal(discord.ui.Modal, title='Role Manager'):
                         color = discord.Color(int(self.role_color.value, 16))
                     except:
                         pass
-                
+
                 role = await self.guild.create_role(name=self.role_name.value, color=color)
                 await interaction.response.send_message(f"✅ Role '{role.name}' created successfully!", ephemeral=True)
-                
+
             elif action == "delete":
                 role = discord.utils.get(self.guild.roles, name=self.role_name.value)
                 if role:
@@ -2909,7 +3226,7 @@ class RoleManagerModal(discord.ui.Modal, title='Role Manager'):
                     await interaction.response.send_message(f"❌ Role '{self.role_name.value}' not found.", ephemeral=True)
             else:
                 await interaction.response.send_message("❌ Invalid action. Use: create, delete, or modify", ephemeral=True)
-                
+
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
 
@@ -2929,7 +3246,7 @@ class WarnAllModal(discord.ui.Modal, title='Warn All Members'):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             await interaction.response.defer(ephemeral=True)
-            
+
             embed = discord.Embed(
                 title="⚠️ Server Warning",
                 description=self.warning_message.value,
@@ -2937,10 +3254,10 @@ class WarnAllModal(discord.ui.Modal, title='Warn All Members'):
                 timestamp=datetime.now()
             )
             embed.set_footer(text=f"Warning from {self.guild.name} Staff")
-            
+
             success_count = 0
             fail_count = 0
-            
+
             for member in self.guild.members:
                 if not member.bot:
                     try:
@@ -2948,7 +3265,7 @@ class WarnAllModal(discord.ui.Modal, title='Warn All Members'):
                         success_count += 1
                     except:
                         fail_count += 1
-            
+
             await interaction.followup.send(
                 f"✅ Warning sent successfully!\n**Sent:** {success_count}\n**Failed:** {fail_count}",
                 ephemeral=True
@@ -2983,17 +3300,17 @@ class ScheduledMessageModal(discord.ui.Modal, title='Schedule Message'):
             if delay < 1 or delay > 1440:  # Max 24 hours
                 await interaction.response.send_message("❌ Delay must be between 1 and 1440 minutes (24 hours).", ephemeral=True)
                 return
-            
+
             # Schedule the message
             import asyncio
             asyncio.create_task(self.send_scheduled_message(delay * 60))
-            
+
             await interaction.response.send_message(f"✅ Message scheduled to send in {delay} minutes!", ephemeral=True)
         except ValueError:
             await interaction.response.send_message("❌ Please enter a valid number for delay.", ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
-    
+
     async def send_scheduled_message(self, delay_seconds):
         await asyncio.sleep(delay_seconds)
         await self.target_channel.send(self.message_content.value)
@@ -3015,33 +3332,33 @@ class MemberSearchModal(discord.ui.Modal, title='Advanced Member Search'):
         try:
             query = self.search_query.value.lower()
             matches = []
-            
+
             for member in self.guild.members:
                 if (query in member.name.lower() or 
                     query in member.display_name.lower() or 
                     query == str(member.id)):
                     matches.append(member)
-            
+
             if not matches:
                 await interaction.response.send_message("❌ No members found matching your search.", ephemeral=True)
                 return
-            
+
             embed = discord.Embed(
                 title=f"🔍 Search Results for '{self.search_query.value}'",
                 description=f"Found {len(matches)} member(s)",
                 color=0x7289da
             )
-            
+
             for i, member in enumerate(matches[:10]):  # Show max 10
                 embed.add_field(
                     name=f"{i+1}. {member.display_name}",
                     value=f"**Username:** {member}\n**ID:** `{member.id}`\n**Joined:** {member.joined_at.strftime('%Y-%m-%d') if member.joined_at else 'Unknown'}",
                     inline=False
                 )
-            
+
             if len(matches) > 10:
                 embed.set_footer(text=f"Showing first 10 of {len(matches)} results")
-            
+
             await interaction.response.send_message(embed=embed, ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
@@ -3053,28 +3370,28 @@ def create_server_stats_embed(guild):
         color=0x7289da,
         timestamp=datetime.now()
     )
-    
+
     # Basic stats
     embed.add_field(
         name="👥 Members",
         value=f"**Total:** {guild.member_count}\n**Humans:** {len([m for m in guild.members if not m.bot])}\n**Bots:** {len([m for m in guild.members if m.bot])}",
         inline=True
     )
-    
+
     # Channel stats
     embed.add_field(
         name="📝 Channels",
         value=f"**Text:** {len(guild.text_channels)}\n**Voice:** {len(guild.voice_channels)}\n**Categories:** {len(guild.categories)}",
         inline=True
     )
-    
+
     # Role stats
     embed.add_field(
         name="🎭 Roles",
         value=f"**Total:** {len(guild.roles)}\n**Mentionable:** {len([r for r in guild.roles if r.mentionable])}\n**Hoisted:** {len([r for r in guild.roles if r.hoist])}",
         inline=True
     )
-    
+
     return embed
 
 def create_automod_embed():
@@ -3083,13 +3400,13 @@ def create_automod_embed():
         description="Configure automatic moderation settings",
         color=0xff0000
     )
-    
+
     embed.add_field(
         name="Available Features",
         value="• Spam Detection\n• Link Filtering\n• Bad Word Filter\n• Caps Lock Detection\n• Mention Spam Protection",
         inline=False
     )
-    
+
     return embed
 
 def create_activity_monitor_embed(guild):
@@ -3099,16 +3416,16 @@ def create_activity_monitor_embed(guild):
         color=0x00ff00,
         timestamp=datetime.now()
     )
-    
+
     # Recent activity
     online_members = len([m for m in guild.members if m.status != discord.Status.offline])
-    
+
     embed.add_field(
         name="Current Activity",
         value=f"**Online:** {online_members}/{guild.member_count}\n**Active Channels:** {len([c for c in guild.text_channels if c.last_message_id])}\n**Voice Activity:** {sum(len(c.members) for c in guild.voice_channels)}",
         inline=False
     )
-    
+
     return embed
 
 async def create_server_backup(guild):
@@ -3120,19 +3437,6 @@ async def create_server_backup(guild):
         'timestamp': datetime.now().isoformat()
     }
     return backup_data
-
-class AutoModView(discord.ui.View):
-    def __init__(self, target_channel):
-        super().__init__(timeout=300)
-        self.target_channel = target_channel
-
-    @discord.ui.button(label='Enable Spam Filter', style=discord.ButtonStyle.success)
-    async def enable_spam_filter(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("✅ Spam filter enabled (simulated)", ephemeral=True)
-
-    @discord.ui.button(label='Configure Word Filter', style=discord.ButtonStyle.primary)
-    async def configure_word_filter(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("⚙️ Word filter configuration opened (simulated)", ephemeral=True)
 
 def create_admin_control_embed(target_channel):
     embed = discord.Embed(
@@ -3176,7 +3480,7 @@ def create_admin_control_embed(target_channel):
         inline=True
     )
 
-    embed.set_footer(text=f"C&C Interface • Target: #{target_channel.name} • All systems operational", icon_url="https://cdn.discordapp.com/emojis/123456789.png")
+    embed.set_footer(text="C&C Interface • Target: #{target_channel.name} • All systems operational", icon_url="https://cdn.discordapp.com/emojis/123456789.png")
     return embed
 
 # Authorized user ID
@@ -3423,6 +3727,169 @@ async def refresh_channels(interaction: discord.Interaction):
 
     embed.set_footer(text="ZSells Auto-Detection System • Enhanced Analysis Complete")
     await interaction.followup.send(embed=embed, ephemeral=True)
+
+# Backup slash commands for embed spawning
+@bot.tree.command(name='spawn_support', description='Spawn support ticket panel in current channel')
+async def spawn_support_command(interaction: discord.Interaction):
+    """Backup command to spawn support panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        embed = create_support_embed()
+        view = SupportView()
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Support panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning support panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_shop', description='Spawn shop panel in current channel')
+async def spawn_shop_command(interaction: discord.Interaction):
+    """Backup command to spawn shop panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        # Updated to use the new shop selection embed and view
+        embed = create_shop_selection_embed()
+        view = ShopSelectionView()
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Shop selection panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning shop panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_gang', description='Spawn gang recruitment panel in current channel')
+async def spawn_gang_command(interaction: discord.Interaction):
+    """Backup command to spawn gang panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        embed = create_gang_embed()
+        view = GangRecruitmentView()
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Gang recruitment panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning gang panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_rules', description='Spawn rules panel in current channel')
+async def spawn_rules_command(interaction: discord.Interaction):
+    """Backup command to spawn rules panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        embed = create_rules_embed()
+        await interaction.channel.send(embed=embed)
+        await interaction.response.send_message("✅ Rules panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning rules panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_welcome', description='Spawn welcome panel in current channel')
+async def spawn_welcome_command(interaction: discord.Interaction):
+    """Backup command to spawn welcome panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        embed = create_welcome_embed()
+        await interaction.channel.send(embed=embed)
+        await interaction.response.send_message("✅ Welcome panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning welcome panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_tos', description='Spawn Terms of Service panel in current channel')
+async def spawn_tos_command(interaction: discord.Interaction):
+    """Backup command to spawn ToS panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        embed = create_tos_embed()
+        await interaction.channel.send(embed=embed)
+        await interaction.response.send_message("✅ Terms of Service panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning ToS panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_news', description='Spawn news panel in current channel')
+async def spawn_news_command(interaction: discord.Interaction):
+    """Backup command to spawn news panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        if not NEWS_DATA["last_updated"]:
+            NEWS_DATA["last_updated"] = datetime.now().isoformat()
+            save_data()
+        embed = create_news_embed()
+        await interaction.channel.send(embed=embed)
+        await interaction.response.send_message("✅ News panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning news panel: {str(e)}", ephemeral=True)
+
+@bot.tree.command(name='spawn_verification', description='Spawn verification panel in current channel')
+async def spawn_verification_command(interaction: discord.Interaction):
+    """Backup command to spawn verification panel"""
+    if not has_admin_permissions(interaction.user, interaction.guild):
+        await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        return
+
+    if not check_channel_permissions(interaction.channel):
+        await interaction.response.send_message("❌ Bot lacks permissions to send messages in this channel.", ephemeral=True)
+        return
+
+    try:
+        embed = discord.Embed(
+            title="🔐 Server Verification",
+            description="**Welcome to the server!**\n\nTo access all channels and features, you need to complete verification.\n\n**How to verify:**\n1. Click the **Verify** button below\n2. Copy the verification code shown\n3. Enter the code in the modal\n4. Submit to complete verification",
+            color=0x00ff00
+        )
+        embed.add_field(
+            name="✅ What happens after verification?",
+            value="• Access to all server channels\n• Ability to participate in discussions\n• Full server permissions\n• Welcome to the community!",
+            inline=False
+        )
+        embed.set_footer(text="ZSells Verification System • Keep the server secure")
+        view = VerificationView()
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Verification panel spawned successfully!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error spawning verification panel: {str(e)}", ephemeral=True)
 
 # Error handling
 @bot.event

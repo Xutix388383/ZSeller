@@ -61,18 +61,52 @@ def spawn_embed():
         embed_type = data.get('embed_type')
         channel_id = data.get('channel_id')
 
+        print(f"📥 Spawn request: {embed_type} in channel {channel_id}")
+
         if not embed_type or not channel_id:
             return jsonify({'error': 'Missing embed_type or channel_id'}), 400
 
-        # Run the spawn function asynchronously
-        asyncio.run_coroutine_threadsafe(
-            spawn_embed_async(embed_type, int(channel_id)),
+        if not bot.is_ready():
+            return jsonify({'error': 'Bot is not ready yet. Please try again in a few seconds.'}), 503
+
+        # Validate channel exists before proceeding
+        try:
+            channel_id_int = int(channel_id)
+            
+            # Quick validation - let the async function handle detailed channel finding
+            channel_found = False
+            for guild in bot.guilds:
+                if any(ch.id == channel_id_int for ch in guild.text_channels):
+                    channel_found = True
+                    print(f"✅ Channel {channel_id} exists in guild {guild.name}")
+                    break
+            
+            if not channel_found:
+                print(f"❌ Channel {channel_id} not found in any guild's text channels")
+                return jsonify({'error': f'Channel with ID {channel_id} not found. Please refresh the page and select a valid channel.'}), 404
+                
+        except ValueError:
+            return jsonify({'error': 'Invalid channel ID format'}), 400
+
+        # Run the spawn function asynchronously with timeout
+        future = asyncio.run_coroutine_threadsafe(
+            spawn_embed_async(embed_type, channel_id_int),
             bot.loop
         )
+        
+        try:
+            # Wait for completion with timeout
+            result = future.result(timeout=10)
+            if result:
+                return jsonify({'success': True, 'message': f'{embed_type} embed spawned successfully in #{channel.name}!'})
+            else:
+                return jsonify({'error': f'Failed to spawn {embed_type} embed. The bot may lack permissions in #{channel.name} or the channel may be inaccessible.'}), 500
+        except asyncio.TimeoutError:
+            return jsonify({'error': 'Request timed out. The embed may still be processing.'}), 408
 
-        return jsonify({'success': True, 'message': f'{embed_type} spawned successfully!'})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Server error in spawn_embed: {str(e)}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/create_custom_embed', methods=['POST'])
 def create_custom_embed():
@@ -87,67 +121,128 @@ def create_custom_embed():
         if not channel_id:
             return jsonify({'error': 'Missing channel_id'}), 400
 
-        # Run the custom embed function asynchronously
-        asyncio.run_coroutine_threadsafe(
+        if not bot.is_ready():
+            return jsonify({'error': 'Bot is not ready yet. Please try again in a few seconds.'}), 503
+
+        # Run the custom embed function asynchronously with timeout
+        future = asyncio.run_coroutine_threadsafe(
             create_custom_embed_async(int(channel_id), title, description, color),
             bot.loop
         )
+        
+        try:
+            # Wait for completion with timeout
+            result = future.result(timeout=10)
+            if result:
+                # Save the custom embed if a name is provided
+                if embed_name:
+                    embed_data = {
+                        'id': str(uuid.uuid4()), # Generate a unique ID
+                        'name': embed_name,
+                        'title': title,
+                        'description': description,
+                        'color': color
+                    }
+                    SAVED_EMBEDS.append(embed_data)
+                    save_embeds_to_file()
+                
+                return jsonify({'success': True, 'message': 'Custom embed created and sent successfully!'})
+            else:
+                return jsonify({'error': 'Failed to create custom embed. Check bot permissions and channel access.'}), 500
+        except asyncio.TimeoutError:
+            return jsonify({'error': 'Request timed out. The embed may still be processing.'}), 408
 
-        # Save the custom embed if a name is provided
-        if embed_name:
-            embed_data = {
-                'id': str(uuid.uuid4()), # Generate a unique ID
-                'name': embed_name,
-                'title': title,
-                'description': description,
-                'color': color
-            }
-            SAVED_EMBEDS.append(embed_data)
-            save_embeds_to_file()
-
-        return jsonify({'success': True, 'message': 'Custom embed created successfully!'})
+    except ValueError:
+        return jsonify({'error': 'Invalid channel ID provided'}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 async def spawn_embed_async(embed_type, channel_id):
     """Spawn embed in the specified channel"""
     try:
+        # Wait for bot to be ready
+        await bot.wait_until_ready()
+        
+        # Enhanced channel finding logic
+        channel = None
+        
+        # First, try direct lookup
         channel = bot.get_channel(channel_id)
+        
+        # If not found, search through all guilds more thoroughly
         if not channel:
-            print(f"❌ Channel {channel_id} not found")
-            return
+            print(f"🔍 Searching for channel {channel_id} across all guilds...")
+            
+            for guild in bot.guilds:
+                try:
+                    # Check text channels first
+                    for text_channel in guild.text_channels:
+                        if text_channel.id == channel_id:
+                            channel = text_channel
+                            print(f"✅ Found channel #{channel.name} in guild {guild.name}")
+                            break
+                    
+                    if channel:
+                        break
+                        
+                    # If still not found, try API fetch
+                    try:
+                        channel = await guild.fetch_channel(channel_id)
+                        if channel:
+                            print(f"✅ Fetched channel #{channel.name} from API in guild {guild.name}")
+                            break
+                    except (discord.NotFound, discord.Forbidden):
+                        continue
+                    except Exception as fetch_error:
+                        print(f"⚠️ Error fetching channel from {guild.name}: {fetch_error}")
+                        continue
+                        
+                except Exception as guild_error:
+                    print(f"⚠️ Error processing guild {guild.name}: {guild_error}")
+                    continue
+        
+        if not channel:
+            print(f"❌ Channel {channel_id} not found in any accessible guild")
+            return False
 
+        # Verify permissions
         if not check_channel_permissions(channel):
-            print(f"❌ No permissions in channel {channel.name}")
-            return
+            print(f"❌ Bot lacks permissions in #{channel.name}")
+            return False
+
+        print(f"✅ Channel verified: #{channel.name} in {channel.guild.name}")
+
+        # Create embed and view based on type
+        embed = None
+        view = None
 
         if embed_type == 'support':
             embed = create_support_embed()
             view = SupportView()
-            await channel.send(embed=embed, view=view)
+            print("📝 Creating support embed with ticket view")
         elif embed_type == 'gang':
             embed = create_gang_embed()
             view = GangRecruitmentView()
-            await channel.send(embed=embed, view=view)
+            print("📝 Creating gang recruitment embed with join view")
         elif embed_type == 'shop':
             embed = create_main_shop_embed()
             view = MainShopView()
-            await channel.send(embed=embed, view=view)
+            print("📝 Creating shop embed with interactive view")
         elif embed_type == 'tos':
             embed = create_tos_embed()
-            await channel.send(embed=embed)
+            print("📝 Creating Terms of Service embed")
         elif embed_type == 'rules':
             embed = create_rules_embed()
-            await channel.send(embed=embed)
+            print("📝 Creating server rules embed")
         elif embed_type == 'news':
             embed = create_news_embed()
-            await channel.send(embed=embed)
+            print("📝 Creating news embed")
         elif embed_type == 'welcome':
             embed = create_welcome_embed()
-            await channel.send(embed=embed)
+            print("📝 Creating welcome embed")
         elif embed_type == 'reminder':
             embed = create_reminder_embed()
-            await channel.send(embed=embed)
+            print("📝 Creating shop reminder embed")
         elif embed_type == 'verification':
             embed = discord.Embed(
                 title="🔐 Server Verification",
@@ -161,23 +256,49 @@ async def spawn_embed_async(embed_type, channel_id):
             )
             embed.set_footer(text="ZSells Verification System • Keep the server secure")
             view = VerificationView()
-            await channel.send(embed=embed, view=view)
+            print("📝 Creating verification embed with verify view")
+        else:
+            print(f"❌ Unknown embed type: {embed_type}")
+            return False
 
-        print(f"✅ {embed_type} spawned in #{channel.name}")
+        # Send the embed
+        if embed:
+            try:
+                if view:
+                    message = await channel.send(embed=embed, view=view)
+                    print(f"✅ {embed_type} embed with interactive buttons sent to #{channel.name}")
+                else:
+                    message = await channel.send(embed=embed)
+                    print(f"✅ {embed_type} embed sent to #{channel.name}")
+                
+                print(f"📨 Message ID: {message.id}")
+                return True
+            except discord.Forbidden:
+                print(f"❌ No permission to send messages in #{channel.name}")
+                return False
+            except Exception as send_error:
+                print(f"❌ Error sending embed: {send_error}")
+                return False
+        
+        return False
     except Exception as e:
-        print(f"❌ Error spawning {embed_type}: {e}")
+        print(f"❌ Critical error in spawn_embed_async: {e}")
+        return False
 
 async def create_custom_embed_async(channel_id, title, description, color):
     """Create a custom embed in the specified channel"""
     try:
+        # Wait for bot to be ready
+        await bot.wait_until_ready()
+        
         channel = bot.get_channel(channel_id)
         if not channel:
             print(f"❌ Channel {channel_id} not found")
-            return
+            return False
 
         if not check_channel_permissions(channel):
             print(f"❌ No permissions in channel {channel.name}")
-            return
+            return False
 
         # Convert hex color to int
         try:
@@ -193,10 +314,12 @@ async def create_custom_embed_async(channel_id, title, description, color):
         )
         embed.set_footer(text="ZSells Custom Embed Creator")
 
-        await channel.send(embed=embed)
-        print(f"✅ Custom embed sent to #{channel.name}")
+        message = await channel.send(embed=embed)
+        print(f"✅ Custom embed sent to #{channel.name} (Message ID: {message.id})")
+        return True
     except Exception as e:
         print(f"❌ Error creating custom embed: {e}")
+        return False
 
 @app.route('/get_guilds')
 def get_guilds():
@@ -250,6 +373,56 @@ def get_guilds():
             })
 
         return jsonify({'guilds': guilds_data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/get_valid_channels')
+def get_valid_channels():
+    """Get all valid channels that the bot can access"""
+    try:
+        if not bot.is_ready():
+            return jsonify({'error': 'Bot is not ready yet'}), 503
+            
+        valid_channels = []
+        for guild in bot.guilds:
+            for channel in guild.text_channels:
+                if check_channel_permissions(channel):
+                    valid_channels.append({
+                        'id': channel.id,
+                        'name': channel.name,
+                        'guild_name': guild.name,
+                        'guild_id': guild.id
+                    })
+        
+        return jsonify({'channels': valid_channels})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/validate_channel/<int:channel_id>')
+def validate_channel(channel_id):
+    """Validate a specific channel and return detailed status"""
+    try:
+        if not bot.is_ready():
+            return jsonify({'error': 'Bot is not ready yet'}), 503
+            
+        channel = bot.get_channel(channel_id)
+        if not channel:
+            return jsonify({'error': 'Channel not found'}), 404
+            
+        validation_result = {
+            'channel_id': channel_id,
+            'channel_name': channel.name,
+            'guild_name': channel.guild.name,
+            'permissions': check_channel_permissions(channel),
+            'bot_can_view': channel.permissions_for(channel.guild.me).view_channel,
+            'bot_can_send': channel.permissions_for(channel.guild.me).send_messages,
+            'bot_can_embed': channel.permissions_for(channel.guild.me).embed_links,
+            'is_text_channel': True,
+            'last_message_time': channel.last_message_id is not None,
+            'validation_timestamp': datetime.now().isoformat()
+        }
+        
+        return jsonify(validation_result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
