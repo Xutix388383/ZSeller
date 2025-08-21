@@ -59,7 +59,7 @@ def get_channels_by_name(guild):
 
             for pattern in patterns:
                 # Multiple matching strategies
-                if (pattern in clean_name or 
+                if (pattern in clean_name or
                     pattern in channel_name_lower or
                     any(pattern in word for word in name_words) or
                     any(word.startswith(pattern) for word in name_words) or
@@ -143,7 +143,7 @@ def get_key_members(guild):
                     print(f"  🛡️ Admin: {member.display_name}")
 
                 # Check for moderator permissions
-                elif (member.guild_permissions.manage_messages or 
+                elif (member.guild_permissions.manage_messages or
                       member.guild_permissions.manage_channels or
                       member.guild_permissions.kick_members) and not member.bot:
                     key_members['moderators'].append(member_data)
@@ -151,8 +151,8 @@ def get_key_members(guild):
                     print(f"  🔨 Moderator: {member.display_name}")
 
                 # Check for staff roles by name
-                elif any(role.name.lower() in ['staff', 'helper', 'support', 'team'] 
-                        for role in member.roles) and not member.bot:
+                elif any(role.name.lower() in ['staff', 'helper', 'support', 'team']
+                         for role in member.roles) and not member.bot:
                     key_members['staff'].append(member_data)
                     staff_count += 1
                     print(f"  👥 Staff: {member.display_name}")
@@ -211,7 +211,7 @@ def analyze_guild_structure(guild):
             },
             'roles': {
                 'total_roles': len(guild.roles),
-                'role_hierarchy': [{'name': role.name, 'members': len(role.members), 'permissions': len([p for p, v in role.permissions if v])} 
+                'role_hierarchy': [{'name': role.name, 'members': len(role.members), 'permissions': len([p for p, v in role.permissions if v])}
                                  for role in sorted(guild.roles, key=lambda r: r.position, reverse=True)[:10]]
             },
             'members': get_key_members(guild)
@@ -286,7 +286,7 @@ def clear_cart(user_id):
 def create_cart_embed(user_id):
     """Create cart display embed"""
     cart = get_user_cart(user_id)
-    
+
     if not cart['items']:
         embed = discord.Embed(
             title="🛒 Your Cart",
@@ -296,14 +296,14 @@ def create_cart_embed(user_id):
         )
         embed.set_footer(text="ZSupply Cart System")
         return embed
-    
+
     embed = discord.Embed(
         title="🛒 Your Cart",
         description=f"**Shop:** {cart['shop']}\n**Items:** {len(cart['items'])}",
         color=0x3498db,
         timestamp=datetime.now()
     )
-    
+
     # Group items by name for cleaner display
     item_counts = {}
     for item in cart['items']:
@@ -316,30 +316,30 @@ def create_cart_embed(user_id):
                 'price': item['price'],
                 'total_price': item['price']
             }
-    
+
     cart_display = []
     for item_name, details in item_counts.items():
         if details['count'] > 1:
             cart_display.append(f"• {item_name} x{details['count']} - ${details['total_price']:.2f}")
         else:
             cart_display.append(f"• {item_name} - ${details['price']:.2f}")
-    
+
     # Split into chunks for display
     item_chunks = [cart_display[i:i+8] for i in range(0, len(cart_display), 8)]
-    
+
     for i, chunk in enumerate(item_chunks):
         embed.add_field(
             name=f"📦 Items {i+1}" if len(item_chunks) > 1 else "📦 Cart Items",
             value="\n".join(chunk),
             inline=False
         )
-    
+
     embed.add_field(
         name="💰 Cart Total",
         value=f"**${cart['total']:.2f}**",
         inline=False
     )
-    
+
     embed.set_footer(text="ZSupply Cart • Ready for checkout")
     return embed
 
@@ -705,7 +705,7 @@ class MainShopView(discord.ui.View):
 
     @discord.ui.button(label='Contact Info', style=discord.ButtonStyle.danger, emoji='📞')
     async def contact_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_contact_embed(), view=ContactView())
+        await interaction.response.edit_message(embed=create_contact_embed(), view=ContactView("The Bronx 3"))
 
 class WeaponsView(discord.ui.View):
     def __init__(self):
@@ -724,7 +724,7 @@ class WeaponsView(discord.ui.View):
             color=0xff6b6b,
             timestamp=datetime.now()
         )
-        
+
         if len(selected_weapons) <= 5:
             embed.add_field(
                 name="🎯 Selected Items",
@@ -737,13 +737,13 @@ class WeaponsView(discord.ui.View):
                 value=f"• {len(selected_weapons)} weapons selected",
                 inline=False
             )
-        
+
         embed.add_field(
             name="📦 Package Options",
             value="• **Safe Package** - $3.00 per weapon\n• **Bag Package** - $2.00 per weapon\n• **Trunk Package** - $1.00 per weapon",
             inline=False
         )
-        
+
         embed.set_footer(text="ZSupply TB3 • Choose package to add to cart")
         view = WeaponPackageView(selected_weapons)
         await interaction.response.edit_message(embed=embed, view=view)
@@ -762,7 +762,7 @@ class WeaponPackageView(discord.ui.View):
         # Add each weapon with safe package to cart
         for weapon in self.weapons:
             add_to_cart(interaction.user.id, f"{weapon} (Safe Package)", 3.00, "The Bronx 3")
-        
+
         embed = discord.Embed(
             title="✅ Added to Cart!",
             description=f"**{len(self.weapons)} weapons** with Safe Package added to cart!\n\n**Added:** ${len(self.weapons) * 3.00:.2f}",
@@ -775,7 +775,7 @@ class WeaponPackageView(discord.ui.View):
         # Add each weapon with bag package to cart
         for weapon in self.weapons:
             add_to_cart(interaction.user.id, f"{weapon} (Bag Package)", 2.00, "The Bronx 3")
-        
+
         embed = discord.Embed(
             title="✅ Added to Cart!",
             description=f"**{len(self.weapons)} weapons** with Bag Package added to cart!\n\n**Added:** ${len(self.weapons) * 2.00:.2f}",
@@ -788,7 +788,7 @@ class WeaponPackageView(discord.ui.View):
         # Add each weapon with trunk package to cart
         for weapon in self.weapons:
             add_to_cart(interaction.user.id, f"{weapon} (Trunk Package)", 1.00, "The Bronx 3")
-        
+
         embed = discord.Embed(
             title="✅ Added to Cart!",
             description=f"**{len(self.weapons)} weapons** with Trunk Package added to cart!\n\n**Added:** ${len(self.weapons) * 1.00:.2f}",
@@ -862,7 +862,7 @@ class WatchesView(discord.ui.View):
         # Add each watch to cart
         for watch in selected_watches:
             add_to_cart(interaction.user.id, watch, 1.00, "The Bronx 3")
-        
+
         total_price = len(selected_watches) * 1.00
         embed = discord.Embed(
             title="✅ Added to Cart!",
@@ -882,12 +882,20 @@ class WatchesView(discord.ui.View):
         await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
 
 class ContactView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, shop_name=None):
         super().__init__(timeout=300)
+        self.shop_name = shop_name
 
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
+    @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.secondary, emoji='⬅️')
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
+        if self.shop_name == "The Bronx 3":
+            await interaction.response.edit_message(embed=create_main_shop_embed(), view=MainShopView())
+        elif self.shop_name == "Philly Streets 2":
+            await interaction.response.edit_message(embed=create_philly_shop_embed(), view=PhillyShopView())
+        elif self.shop_name == "South Bronx The Trenches":
+            await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
+        else:
+            await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
 
 # Cart Views
 class AddedToCartView(discord.ui.View):
@@ -913,11 +921,11 @@ class AddedToCartView(discord.ui.View):
             await interaction.response.edit_message(embed=create_philly_special_embed(), view=PhillySpecialView())
         # South Bronx Categories
         elif self.category == "sb_weapons":
-            await interaction.response.edit_message(embed=create_sb_weapons_embed(), view=SBWeaponsView())
+            await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
         elif self.category == "sb_money":
-            await interaction.response.edit_message(embed=create_sb_money_embed(), view=SBMoneyView())
+            await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
         elif self.category == "sb_survival":
-            await interaction.response.edit_message(embed=create_sb_survival_embed(), view=SBSurvivalView())
+            await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
         else:
             await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
 
@@ -951,24 +959,24 @@ class CartView(discord.ui.View):
     @discord.ui.button(label='Checkout', style=discord.ButtonStyle.success, emoji='💳')
     async def checkout(self, interaction: discord.Interaction, button: discord.ui.Button):
         cart = get_user_cart(self.user_id)
-        
+
         if not cart['items']:
             await interaction.response.send_message("❌ Your cart is empty!", ephemeral=True)
             return
-        
+
         # Create cart summary for ticket
         item_summary = []
         for item in cart['items']:
             item_summary.append(f"• {item['name']} - ${item['price']:.2f}")
-        
+
         cart_details = "\n".join(item_summary[:10])  # Show first 10 items
         if len(cart['items']) > 10:
             cart_details += f"\n... and {len(cart['items']) - 10} more items"
-        
+
         cart_details += f"\n\n**Total: ${cart['total']:.2f}**"
-        
+
         await create_private_order_ticket(interaction, self.shop_name, f"Cart Checkout - {len(cart['items'])} items")
-        
+
         # Clear cart after checkout
         clear_cart(self.user_id)
 
@@ -1041,11 +1049,11 @@ class ShopSelectionView(discord.ui.View):
 
     @discord.ui.button(label='Philly Streets 2', style=discord.ButtonStyle.success, emoji='🦅')
     async def philly_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_philly_shop_embed(), view=PhillyShopView())
+        await interaction.response.edit_message(embed=create_philly_shop_embed(), view=PhillyShopView(show_back=True))
 
     @discord.ui.button(label='South Bronx The Trenches', style=discord.ButtonStyle.danger, emoji='🔥')
     async def south_bronx_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
+        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView(show_back=True))
 
     @discord.ui.button(label='Roblox Alts Shop', style=discord.ButtonStyle.secondary, emoji='🎮')
     async def roblox_alts_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1054,58 +1062,62 @@ class ShopSelectionView(discord.ui.View):
 # PHILLY STREETS 2 SHOP LOGIC START
 def create_philly_shop_embed():
     embed = discord.Embed(
-        title="🦅 Philly Streets 2 - Premium Shop",
-        description="**Welcome to Philly Streets 2 Premium Shop**\n\nYour one-stop destination for all PS2 needs!",
+        title="🦅 Philly Streets 2 - Money Services",
+        description="**Welcome to Philly Streets 2 Shop**\n\nPremium money services - $1 per million!",
         color=0x00ff00,
         timestamp=datetime.now()
     )
     embed.add_field(
-        name="🔫 Available Products",
-        value="• Premium Weapons Collection\n• Money & Bank Services\n• Luxury Items\n• Special Packages",
+        name="💰 Money Services Available",
+        value="✅ **$1 per Million** - Best rates guaranteed\n✅ **Minimum Order: 1 Million**\n✅ **Maximum Order: 10 Million**\n✅ **Instant Delivery** - Fast & reliable",
         inline=False
     )
     embed.add_field(
-        name="💰 Pricing",
-        value="**Competitive prices for all items**\nBulk orders get discounts!",
+        name="🔫 Weapons Status",
+        value="🚧 **Weapons Coming Soon!**\nWeapons will be available for purchase soon. Stay tuned for updates!",
         inline=True
     )
     embed.add_field(
         name="🚀 Features",
-        value="✅ **Instant Delivery** - Fast & reliable\n✅ **24/7 Support** - Always here to help\n✅ **Secure Payment** - Safe transactions\n✅ **Quality Guaranteed** - Premium products",
+        value="✅ **Best Rates** - $1 per million\n✅ **24/7 Support** - Always here\n✅ **Secure Payment** - Safe deals\n✅ **Quality Guaranteed** - Trusted service",
         inline=True
     )
     embed.add_field(
-        name="📦 What's Included",
-        value="🔸 High-quality game items\n🔸 Fast delivery service\n🔸 Customer support\n🔸 Setup assistance",
+        name="📊 Pricing Examples",
+        value="• **1 Million** - $1.00\n• **5 Million** - $5.00\n• **10 Million** - $10.00 (Max order)",
         inline=False
     )
-    embed.set_footer(text="ZSupply Philly Streets 2 • Select your category below")
+    embed.set_footer(text="ZSupply Philly Streets 2 • Order money below")
     return embed
 
 class PhillyShopView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, show_back=False):
         super().__init__(timeout=300)
+        self.show_back = show_back
 
-    @discord.ui.button(label='Weapons', style=discord.ButtonStyle.primary, emoji='🔫')
-    async def philly_weapons_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_philly_weapons_embed(), view=PhillyWeaponsView())
+        # Add back button only if there are other tabs
+        if self.show_back:
+            self.add_item(self.create_back_button())
 
-    @discord.ui.button(label='Money Services', style=discord.ButtonStyle.success, emoji='💰')
+    def create_back_button(self):
+        back_button = discord.ui.Button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
+        async def back_callback(interaction):
+            await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+        back_button.callback = back_callback
+        return back_button
+
+    @discord.ui.button(label='Order Money ($1/Million)', style=discord.ButtonStyle.success, emoji='💰')
     async def philly_money_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_philly_money_embed(), view=PhillyMoneyView())
-
-    @discord.ui.button(label='Special Items', style=discord.ButtonStyle.secondary, emoji='⭐')
-    async def philly_special_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_philly_special_embed(), view=PhillySpecialView())
 
     @discord.ui.button(label='View Cart', style=discord.ButtonStyle.primary, emoji='🛒')
     async def view_cart_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         cart_embed = create_cart_embed(interaction.user.id)
         await interaction.response.edit_message(embed=cart_embed, view=CartView(interaction.user.id, "Philly Streets 2"))
 
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+    @discord.ui.button(label='Contact Info', style=discord.ButtonStyle.danger, emoji='📞')
+    async def contact_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_contact_embed(), view=ContactView("Philly Streets 2"))
 
 def create_philly_weapons_embed():
     embed = discord.Embed(
@@ -1153,44 +1165,60 @@ class PhillyWeaponsView(discord.ui.View):
 
 def create_philly_money_embed():
     embed = discord.Embed(
-        title="💰 Philly Streets 2 - Money Services",
-        description="**Fast and secure money services for PS2**\n\nGet rich quick with our money packages!",
+        title="💰 Philly Streets 2 - Money Orders",
+        description="**$1 per Million - Best Rates Available!**\n\nCustom money amounts from 1M to 10M",
         color=0xffd700,
         timestamp=datetime.now()
     )
     embed.add_field(
-        name="💵 Money Packages",
-        value="• Basic Money - $1.50\n• Premium Money - $2.50\n• VIP Money - $4.00\n• Ultimate Package - $6.00",
+        name="💵 Pricing Structure",
+        value="**$1.00 per 1 Million**\n• Minimum Order: 1 Million ($1.00)\n• Maximum Order: 10 Million ($10.00)\n• Custom amounts available",
         inline=False
     )
     embed.add_field(
-        name="🏦 Bank Services",
-        value="• Bank Protection - $1.00\n• Max Bank Fill - $2.00\n• Bank Security - $1.50",
+        name="📊 Popular Orders",
+        value="• **1 Million** - $1.00\n• **2 Million** - $2.00\n• **5 Million** - $5.00\n• **10 Million** - $10.00",
+        inline=True
+    )
+    embed.add_field(
+        name="🚀 Features",
+        value="✅ Instant delivery\n✅ Safe & secure\n✅ 24/7 support\n✅ Custom amounts\n✅ Best rates guaranteed",
+        inline=True
+    )
+    embed.add_field(
+        name="💡 How to Order",
+        value="Choose from the popular amounts below or contact us for custom amounts between 1M-10M!",
         inline=False
     )
-    embed.set_footer(text="ZSupply PS2 Money • Fast delivery guaranteed")
+    embed.set_footer(text="ZSupply PS2 Money • $1 per million - Min: 1M, Max: 10M")
     return embed
 
 class PhillyMoneyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=300)
 
-    @discord.ui.button(label='Add Basic Money - $1.50', style=discord.ButtonStyle.primary, emoji='💵')
-    async def add_basic_money(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "PS2 Basic Money", 1.50, "Philly Streets 2")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**PS2 Basic Money** added!\n\n**Added:** $1.50", color=0x00ff00)
+    @discord.ui.button(label='1 Million - $1.00', style=discord.ButtonStyle.primary, emoji='💵')
+    async def add_1m_money(self, interaction: discord.Interaction, button: discord.ui.Button):
+        add_to_cart(interaction.user.id, "PS2 Money (1 Million)", 1.00, "Philly Streets 2")
+        embed = discord.Embed(title="✅ Added to Cart!", description="**1 Million PS2 Money** added!\n\n**Added:** $1.00", color=0x00ff00)
         await interaction.response.edit_message(embed=embed, view=AddedToCartView("philly_money"))
 
-    @discord.ui.button(label='Add Premium Money - $2.50', style=discord.ButtonStyle.success, emoji='💎')
-    async def add_premium_money(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "PS2 Premium Money", 2.50, "Philly Streets 2")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**PS2 Premium Money** added!\n\n**Added:** $2.50", color=0x00ff00)
+    @discord.ui.button(label='2 Million - $2.00', style=discord.ButtonStyle.primary, emoji='💰')
+    async def add_2m_money(self, interaction: discord.Interaction, button: discord.ui.Button):
+        add_to_cart(interaction.user.id, "PS2 Money (2 Million)", 2.00, "Philly Streets 2")
+        embed = discord.Embed(title="✅ Added to Cart!", description="**2 Million PS2 Money** added!\n\n**Added:** $2.00", color=0x00ff00)
         await interaction.response.edit_message(embed=embed, view=AddedToCartView("philly_money"))
 
-    @discord.ui.button(label='Add VIP Money - $4.00', style=discord.ButtonStyle.danger, emoji='👑')
-    async def add_vip_money(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "PS2 VIP Money", 4.00, "Philly Streets 2")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**PS2 VIP Money** added!\n\n**Added:** $4.00", color=0x00ff00)
+    @discord.ui.button(label='5 Million - $5.00', style=discord.ButtonStyle.success, emoji='💎')
+    async def add_5m_money(self, interaction: discord.Interaction, button: discord.ui.Button):
+        add_to_cart(interaction.user.id, "PS2 Money (5 Million)", 5.00, "Philly Streets 2")
+        embed = discord.Embed(title="✅ Added to Cart!", description="**5 Million PS2 Money** added!\n\n**Added:** $5.00", color=0x00ff00)
+        await interaction.response.edit_message(embed=embed, view=AddedToCartView("philly_money"))
+
+    @discord.ui.button(label='10 Million - $10.00', style=discord.ButtonStyle.danger, emoji='👑')
+    async def add_10m_money(self, interaction: discord.Interaction, button: discord.ui.Button):
+        add_to_cart(interaction.user.id, "PS2 Money (10 Million)", 10.00, "Philly Streets 2")
+        embed = discord.Embed(title="✅ Added to Cart!", description="**10 Million PS2 Money** added!\n\n**Added:** $10.00", color=0x00ff00)
         await interaction.response.edit_message(embed=embed, view=AddedToCartView("philly_money"))
 
     @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
@@ -1243,418 +1271,65 @@ class PhillySpecialView(discord.ui.View):
     async def back_to_philly_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_philly_shop_embed(), view=PhillyShopView())
 
-def create_philly_contact_embed():
-    embed = discord.Embed(
-        title="📞 Philly Streets 2 - Contact Info",
-        description="**Ready to place your PS2 order?**",
-        color=0xe74c3c,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="📞 Contact Information",
-        value="**Contact:** zpofe\n**Response Time:** Instant\n**Availability:** 24/7",
-        inline=False
-    )
-    embed.add_field(
-        name="💳 Payment Methods",
-        value="• CashApp\n• Apple Pay\n• Secure & Fast",
-        inline=True
-    )
-    embed.add_field(
-        name="🚀 Delivery",
-        value="• Instant delivery\n• Setup included\n• Full support",
-        inline=True
-    )
-    embed.set_footer(text="ZSupply PS2 • Contact us to complete your order!")
-    return embed
-
-class PhillyContactView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_philly_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_philly_shop_embed(), view=PhillyShopView())
-
-def create_philly_order_embed(category):
-    embed = discord.Embed(
-        title="📋 Philly Streets 2 - Order Information",
-        description="**Ready to complete your PS2 order?**",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🎮 Order Details",
-        value=f"**Game:** Philly Streets 2\n**Category:** {category}\n**Status:** Ready to order",
-        inline=False
-    )
-    embed.add_field(
-        name="📞 Contact to Order",
-        value="**Contact:** zpofe\n**Response:** Instant",
-        inline=True
-    )
-    embed.add_field(
-        name="💳 Payment Methods",
-        value="• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n• **PayPal:** Coming Soon (broken)",
-        inline=False
-    )
-    embed.add_field(
-        name="⚡ Order Process",
-        value="1️⃣ Contact us with your selection\n2️⃣ Complete payment\n3️⃣ Receive your items instantly\n4️⃣ Get setup support\n5️⃣ Enjoy your PS2 experience!",
-        inline=False
-    )
-    embed.set_footer(text="ZSupply PS2 • Contact us to complete your order!")
-    return embed
-
-class PhillyOrderView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Back to PS2 Shop', style=discord.ButtonStyle.primary, emoji='🦅')
-    async def back_to_philly_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_philly_shop_embed(), view=PhillyShopView())
-
-    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
-
-    @discord.ui.button(label='Back to Main Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_main_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
-
 # SOUTH BRONX THE TRENCHES SHOP LOGIC START
 def create_south_bronx_shop_embed():
     embed = discord.Embed(
-        title="🔥 South Bronx The Trenches - Elite Shop",
-        description="**Welcome to South Bronx The Trenches Elite Shop**\n\nThe most hardcore shop for the toughest game!",
+        title="🔥 South Bronx The Trenches - Elite Modded Account",
+        description="**Premium Modded Account - Only $3.00**\n\nGet a fully loaded 200+ day old account with everything you need!",
         color=0xff0000,
         timestamp=datetime.now()
     )
     embed.add_field(
-        name="💀 Elite Products",
-        value="• Hardcore Weapons Arsenal\n• Street Money Services\n• Survival Gear\n• Elite Packages",
+        name="💰 Money Included",
+        value="✅ **Clean Money: 1.75M** - Max clean money\n✅ **Bank Money: 1.75M** - Max bank money\n✅ **Total Value: 3.5M** - Fully loaded account",
         inline=False
     )
     embed.add_field(
-        name="💰 Street Pricing",
-        value="**Raw deals for raw streets**\nSurvival prices for survivors!",
+        name="🎮 Account Features",
+        value="✅ **200+ Days Old** - Trusted & aged account\n✅ **Fully Modded** - All hacks pre-installed\n✅ **Lucky Weapons** - Get weapons if you're lucky!\n✅ **Instant Delivery** - Fast & reliable",
         inline=True
     )
     embed.add_field(
-        name="🔥 Trenches Features",
-        value="✅ **Instant Drop** - Fast delivery\n✅ **24/7 Hustle** - Always available\n✅ **Street Secure** - Safe deals\n✅ **Elite Quality** - Hardcore gear",
+        name="🔥 Mods Included",
+        value="🔸 Speed Hack\n🔸 Jump Boost\n🔸 God Mode\n🔸 ESP/Wallhacks\n🔸 Auto-Farm\n🔸 No Clip",
         inline=True
     )
     embed.add_field(
-        name="⚡ Survival Package",
-        value="🔸 Combat-ready items\n🔸 Street survival gear\n🔸 Elite support network\n🔸 Trenches expertise",
+        name="🎯 What You Get",
+        value="🔸 200+ day old Roblox account\n🔸 1.75M clean + 1.75M bank money\n🔸 Weapons (if you get lucky!)\n🔸 All mods pre-configured\n🔸 Account credentials\n🔸 Setup instructions",
         inline=False
     )
-    embed.set_footer(text="ZSupply South Bronx Trenches • Elite survival gear")
+    embed.set_footer(text="ZSupply South Bronx Trenches • Best value account for $3!")
     return embed
 
 class SouthBronxShopView(discord.ui.View):
-    def __init__(self):
+    def __init__(self, show_back=False):
         super().__init__(timeout=300)
+        self.show_back = show_back
 
-    @discord.ui.button(label='Arsenal', style=discord.ButtonStyle.danger, emoji='💀')
-    async def sb_weapons_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_sb_weapons_embed(), view=SBWeaponsView())
+        # Add back button only if there are other tabs
+        if self.show_back:
+            self.add_item(self.create_back_button())
 
-    @discord.ui.button(label='Street Money', style=discord.ButtonStyle.success, emoji='💵')
-    async def sb_money_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_sb_money_embed(), view=SBMoneyView())
+    def create_back_button(self):
+        back_button = discord.ui.Button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
+        async def back_callback(interaction):
+            await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+        back_button.callback = back_callback
+        return back_button
 
-    @discord.ui.button(label='Survival Gear', style=discord.ButtonStyle.primary, emoji='🛡️')
-    async def sb_survival_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_sb_survival_embed(), view=SBSurvivalView())
+    @discord.ui.button(label='South Bronx Account - $3.00', style=discord.ButtonStyle.success, emoji='🎮')
+    async def sb_modded_account_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await create_private_order_ticket(interaction, "South Bronx The Trenches", "Elite Modded Account (1.75M Clean + 1.75M Bank + Lucky Weapons) - $3.00")
 
     @discord.ui.button(label='View Cart', style=discord.ButtonStyle.primary, emoji='🛒')
     async def view_cart_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         cart_embed = create_cart_embed(interaction.user.id)
         await interaction.response.edit_message(embed=cart_embed, view=CartView(interaction.user.id, "South Bronx The Trenches"))
 
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
-
-def create_sb_weapons_embed():
-    embed = discord.Embed(
-        title="💀 South Bronx Trenches - Arsenal",
-        description="**Hardcore weapons for the streets**\n\nSurvive the trenches with elite firepower!",
-        color=0x8b0000,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🔫 Street Arsenal",
-        value="• Trenches Special - $4.00\n• Street Sweeper - $5.00\n• Survival Kit - $3.50\n• Elite Package - $7.00\n• Hardcore Bundle - $6.50",
-        inline=False
-    )
-    embed.add_field(
-        name="💰 Street Prices",
-        value="**Starting from $3.50**\nReal prices for real gear!",
-        inline=True
-    )
-    embed.add_field(
-        name="⚡ Combat Ready",
-        value="✅ Instant deployment\n✅ Street tested\n✅ Combat proven\n✅ Elite grade",
-        inline=True
-    )
-    embed.set_footer(text="ZSupply SB Trenches • Combat grade arsenal")
-    return embed
-
-class SBWeaponsView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Add Trenches Special - $4.00', style=discord.ButtonStyle.danger, emoji='💀')
-    async def add_trenches_special(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Trenches Special Arsenal", 4.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Trenches Special Arsenal** added!\n\n**Added:** $4.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_weapons"))
-
-    @discord.ui.button(label='Add Street Sweeper - $5.00', style=discord.ButtonStyle.primary, emoji='🔫')
-    async def add_street_sweeper(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Street Sweeper Package", 5.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Street Sweeper Package** added!\n\n**Added:** $5.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_weapons"))
-
-    @discord.ui.button(label='Add Elite Package - $7.00', style=discord.ButtonStyle.success, emoji='⚡')
-    async def add_elite_package(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Elite Trenches Package", 7.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Elite Trenches Package** added!\n\n**Added:** $7.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_weapons"))
-
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-def create_sb_money_embed():
-    embed = discord.Embed(
-        title="💵 South Bronx Trenches - Street Money",
-        description="**Street cash for street survival**\n\nGet paid in the trenches!",
-        color=0x228b22,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="💸 Street Cash",
-        value="• Hustle Package - $2.00\n• Street Money - $3.50\n• Elite Cash - $5.00\n• Trenches VIP - $7.50",
-        inline=False
-    )
-    embed.add_field(
-        name="🏪 Street Banking",
-        value="• Safe Stash - $1.50\n• Elite Vault - $3.00\n• Trenches Bank - $2.50",
-        inline=False
-    )
-    embed.set_footer(text="ZSupply SB Trenches • Street money guaranteed")
-    return embed
-
-class SBMoneyView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Add Hustle Package - $2.00', style=discord.ButtonStyle.primary, emoji='💵')
-    async def add_hustle_package(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Street Hustle Package", 2.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Street Hustle Package** added!\n\n**Added:** $2.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_money"))
-
-    @discord.ui.button(label='Add Street Money - $3.50', style=discord.ButtonStyle.success, emoji='💰')
-    async def add_street_money(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Street Money Package", 3.50, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Street Money Package** added!\n\n**Added:** $3.50", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_money"))
-
-    @discord.ui.button(label='Add Trenches VIP - $7.50', style=discord.ButtonStyle.danger, emoji='👑')
-    async def add_trenches_vip(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Trenches VIP Package", 7.50, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Trenches VIP Package** added!\n\n**Added:** $7.50", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_money"))
-
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-def create_sb_survival_embed():
-    embed = discord.Embed(
-        title="🛡️ South Bronx Trenches - Survival Gear",
-        description="**Elite survival gear for the trenches**\n\nSurvive the streets with premium gear!",
-        color=0x4169e1,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🔧 Survival Kit",
-        value="• Street Armor - $4.50\n• Elite Protection - $6.00\n• Trenches Gear - $5.50\n• Survival Package - $8.00\n• Ultimate Kit - $10.00",
-        inline=False
-    )
-    embed.add_field(
-        name="⚡ Elite Features",
-        value="✅ Combat tested\n✅ Street proven\n✅ Elite grade\n✅ Survival ready",
-        inline=True
-    )
-    embed.set_footer(text="ZSupply SB Trenches • Survival guaranteed")
-    return embed
-
-class SBSurvivalView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Add Street Armor - $4.50', style=discord.ButtonStyle.primary, emoji='🛡️')
-    async def add_street_armor(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Street Armor Package", 4.50, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Street Armor Package** added!\n\n**Added:** $4.50", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_survival"))
-
-    @discord.ui.button(label='Add Elite Protection - $6.00', style=discord.ButtonStyle.success, emoji='⚡')
-    async def add_elite_protection(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Elite Protection Package", 6.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Elite Protection Package** added!\n\n**Added:** $6.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_survival"))
-
-    @discord.ui.button(label='Add Ultimate Kit - $10.00', style=discord.ButtonStyle.danger, emoji='💎')
-    async def add_ultimate_kit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Ultimate Survival Kit", 10.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**Ultimate Survival Kit** added!\n\n**Added:** $10.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_survival"))
-
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-def create_sb_modded_account_embed():
-    embed = discord.Embed(
-        title="🎮 South Bronx Trenches - Modded Account",
-        description="**Get a fully modded account for South Bronx The Trenches!**\n\nMax $3 - Best value modded account!",
-        color=0x9b59b6,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🔥 Account Features",
-        value="✅ **200+ Days Old** - Trusted account\n✅ **Fully Modded** - All hacks included\n✅ **Street Ready** - Combat tested\n✅ **Max $3** - Best price guaranteed",
-        inline=False
-    )
-    embed.add_field(
-        name="⚡ Mods Included",
-        value="🔸 Speed Hack\n🔸 Jump Boost\n🔸 God Mode\n🔸 ESP/Wallhacks\n🔸 Auto-Farm\n🔸 Infinite Money",
-        inline=True
-    )
-    embed.add_field(
-        name="📦 What You Get",
-        value="✅ Account credentials\n✅ Pre-installed mods\n✅ Setup instructions\n✅ 24/7 support\n✅ Trenches ready",
-        inline=True
-    )
-    embed.add_field(
-        name="💰 Pricing",
-        value="**Only $3.00** - Maximum value!\nInstant delivery guaranteed",
-        inline=False
-    )
-    embed.set_footer(text="ZSupply SB Trenches • Max $3 modded account")
-    return embed
-
-class SBModdedAccountView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Order Modded Account - $3', style=discord.ButtonStyle.success, emoji='🎮')
-    async def order_modded_account(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await create_private_order_ticket(interaction, "South Bronx The Trenches", "Modded Account - $3.00")
-
-    @discord.ui.button(label='Back to SB Shop', style=discord.ButtonStyle.secondary, emoji='🔥')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-def create_sb_contact_embed():
-    embed = discord.Embed(
-        title="📱 South Bronx Trenches - Contact",
-        description="**Ready for street business?**",
-        color=0x696969,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="📞 Street Contact",
-        value="**Contact:** zpofe\n**Response:** Instant\n**Available:** 24/7 Hustle",
-        inline=False
-    )
-    embed.add_field(
-        name="💳 Street Payment",
-        value="• CashApp\n• Apple Pay\n• Fast & Secure",
-        inline=True
-    )
-    embed.add_field(
-        name="🚀 Street Delivery",
-        value="• Instant drop\n• Street tested\n• Elite support",
-        inline=True
-    )
-    embed.set_footer(text="ZSupply SB Trenches • Street business")
-    return embed
-
-class SBContactView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-class SBModdedAccountView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Add Modded Account - $3.00', style=discord.ButtonStyle.success, emoji='🎮')
-    async def add_modded_account(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "SB Modded Account (200+ days)", 3.00, "South Bronx The Trenches")
-        embed = discord.Embed(title="✅ Added to Cart!", description="**SB Modded Account** added!\n\n**Added:** $3.00", color=0x00ff00)
-        await interaction.response.edit_message(embed=embed, view=AddedToCartView("sb_modded"))
-
-    @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-def create_sb_order_embed(category):
-    embed = discord.Embed(
-        title="📋 South Bronx Trenches - Order Info",
-        description="**Ready for street business?**",
-        color=0xff4500,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🎮 Street Order",
-        value=f"**Game:** South Bronx The Trenches\n**Category:** {category}\n**Status:** Ready for street business",
-        inline=False
-    )
-    embed.add_field(
-        name="📱 Street Contact",
-        value="**Contact:** zpofe\n**Response:** Instant",
-        inline=True
-    )
-    embed.add_field(
-        name="💳 Street Payment",
-        value="• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n• **PayPal:** Coming Soon (broken)",
-        inline=False
-    )
-    embed.add_field(
-        name="⚡ Street Process",
-        value="1️⃣ Hit us up with your order\n2️⃣ Handle payment\n3️⃣ Get your gear instantly\n4️⃣ Receive street support\n5️⃣ Dominate the trenches!",
-        inline=False
-    )
-    embed.set_footer(text="ZSupply SB Trenches • Street business")
-    return embed
-
-class SBOrderView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Back to SB Shop', style=discord.ButtonStyle.primary, emoji='🔥')
-    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView())
-
-    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
-
-    @discord.ui.button(label='Back to Main Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_main_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+    @discord.ui.button(label='Contact Info', style=discord.ButtonStyle.danger, emoji='📞')
+    async def contact_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(embed=create_contact_embed(), view=ContactView("South Bronx The Trenches"))
 
 # ROBLOX ALTS SHOP LOGIC START
 def create_roblox_alts_embed():
@@ -1676,7 +1351,7 @@ def create_roblox_alts_embed():
     )
     embed.add_field(
         name="🎯 Available Games",
-        value="• The Bronx 3 (TB3)\n• Philly Streets 2\n• South Bronx The Trenches",
+        value="• The Bronx 3\n• Philly Streets 2\n• South Bronx The Trenches",
         inline=True
     )
     embed.add_field(
@@ -1703,13 +1378,10 @@ class RobloxAltsView(discord.ui.View):
     async def south_bronx_account(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_roblox_account_info_embed("South Bronx The Trenches"), view=RobloxOrderView("South Bronx"))
 
-    @discord.ui.button(label='Back to Roblox Shop', style=discord.ButtonStyle.secondary, emoji='🎮')
-    async def back_to_roblox_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_roblox_alts_embed(), view=RobloxAltsView())
-
     @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_main_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
+
 
 def create_roblox_account_info_embed(game_name):
     embed = discord.Embed(
@@ -1755,7 +1427,7 @@ class RobloxOrderView(discord.ui.View):
     async def order_account(self, interaction: discord.Interaction, button: discord.ui.Button):
         game_names = {
             "TB3": "The Bronx 3",
-            "Philly": "Philly Streets 2", 
+            "Philly": "Philly Streets 2",
             "South Bronx": "South Bronx The Trenches"
         }
         game_name = game_names.get(self.game_type, self.game_type)
@@ -1766,71 +1438,6 @@ class RobloxOrderView(discord.ui.View):
         await interaction.response.edit_message(embed=create_roblox_alts_embed(), view=RobloxAltsView())
 
     @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_main_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
-
-def create_roblox_order_info_embed(game_type):
-    game_names = {
-        "TB3": "The Bronx 3",
-        "Philly": "Philly Streets 2", 
-        "South Bronx": "South Bronx The Trenches"
-    }
-
-    game_name = game_names.get(game_type, game_type)
-
-    embed = discord.Embed(
-        title="📋 Roblox Account Order Information",
-        description="**Ready to complete your order?**",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
-
-    embed.add_field(
-        name="🎮 Order Details",
-        value=f"**Product:** Modded Roblox Account\n**Game:** {game_name}\n**Age:** 200+ Days\n**Price:** $3.00",
-        inline=False
-    )
-
-    embed.add_field(
-        name="📞 Contact to Order",
-        value="**Contact:** zpofe\n**Response Time:** Instant",
-        inline=True
-    )
-
-    embed.add_field(
-        name="💳 Payment Methods", 
-        value="• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n• **PayPal:** Coming Soon (broken)",
-        inline=True
-    )
-
-    embed.add_field(
-        name="⚡ Delivery Process",
-        value="1️⃣ Contact us with your order\n2️⃣ Complete payment ($3.00)\n3️⃣ Receive account credentials\n4️⃣ Get setup instructions\n5️⃣ Start dominating the game!",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🛡️ Guarantees",
-        value="✅ Account age 200+ days verified\n✅ All mods pre-installed & tested\n✅ Full account access provided\n✅ 24/7 customer support",
-        inline=False
-    )
-
-    embed.set_footer(text="ZSupply • Contact us to complete your order!")
-    return embed
-
-class RobloxContactView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label='Back to Roblox Shop', style=discord.ButtonStyle.primary, emoji='🎮')
-    async def back_to_roblox_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_roblox_alts_embed(), view=RobloxAltsView())
-
-    @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
-    async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
-
-    @discord.ui.button(label='Back to Main Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
     async def back_to_main_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(embed=create_shop_selection_embed(), view=ShopSelectionView())
 
@@ -1867,67 +1474,23 @@ def create_weapons_embed():
         color=0xff6b6b,
         timestamp=datetime.now()
     )
-    
+
     # Split weapons into chunks for display
     weapon_chunks = [WEAPONS[i:i+10] for i in range(0, len(WEAPONS), 10)]
-    
+
     for i, chunk in enumerate(weapon_chunks[:3]):  # Show first 3 chunks
         embed.add_field(
             name=f"🔥 Weapons Collection {i+1}",
             value="\n".join([f"• {weapon}" for weapon in chunk]),
             inline=True
         )
-    
+
     embed.add_field(
         name="💰 Package Pricing",
         value="• **Safe Package** - $3.00\n• **Bag Package** - $2.00\n• **Trunk Package** - $1.00",
         inline=False
     )
     embed.set_footer(text="ZSupply TB3 Weapons • Select weapons below")
-    return embed
-
-def create_weapon_package_embed(weapon):
-    embed = discord.Embed(
-        title=f"🔫 {weapon} - Package Selection",
-        description=f"**Selected Weapon:** {weapon}\n\nChoose your delivery package:",
-        color=0xff6b6b,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="📦 Available Packages",
-        value="• **Safe Package** - $3.00 (Most Secure)\n• **Bag Package** - $2.00 (Balanced)\n• **Trunk Package** - $1.00 (Basic)",
-        inline=False
-    )
-    embed.set_footer(text="ZSupply TB3 • Choose your package")
-    return embed
-
-def create_multi_weapon_package_embed(weapons):
-    embed = discord.Embed(
-        title=f"🔫 Multiple Weapons - Package Selection",
-        description=f"**Selected Weapons:** {len(weapons)} items\n\nChoose your delivery package:",
-        color=0xff6b6b,
-        timestamp=datetime.now()
-    )
-    
-    if len(weapons) <= 5:
-        embed.add_field(
-            name="🎯 Selected Items",
-            value="\n".join([f"• {weapon}" for weapon in weapons]),
-            inline=False
-        )
-    else:
-        embed.add_field(
-            name="🎯 Selected Items",
-            value=f"• {len(weapons)} weapons selected\n• Full list will be provided after order",
-            inline=False
-        )
-    
-    embed.add_field(
-        name="📦 Available Packages",
-        value="• **Safe Package** - $3.00 (Most Secure)\n• **Bag Package** - $2.00 (Balanced)\n• **Trunk Package** - $1.00 (Basic)",
-        inline=False
-    )
-    embed.set_footer(text="ZSupply TB3 • Choose your package")
     return embed
 
 def create_money_embed():
@@ -1962,17 +1525,17 @@ def create_watches_embed():
         color=0x9b59b6,
         timestamp=datetime.now()
     )
-    
+
     # Split watches into chunks for display
     watch_chunks = [WATCHES[i:i+8] for i in range(0, len(WATCHES), 8)]
-    
+
     for i, chunk in enumerate(watch_chunks[:2]):  # Show first 2 chunks
         embed.add_field(
             name=f"⌚ Watch Collection {i+1}",
             value="\n".join([f"• {watch}" for watch in chunk]),
             inline=True
         )
-    
+
     embed.add_field(
         name="💰 Pricing",
         value="**$1.00 per watch**\nMultiple watches available!",
@@ -1983,8 +1546,8 @@ def create_watches_embed():
 
 def create_contact_embed():
     embed = discord.Embed(
-        title="📞 The Bronx 3 - Contact Information",
-        description="**Ready to place your TB3 order?**",
+        title="📞 Contact Information",
+        description="**Ready to place your order or need assistance?**",
         color=0xe74c3c,
         timestamp=datetime.now()
     )
@@ -2003,487 +1566,8 @@ def create_contact_embed():
         value="• Instant delivery after payment\n• Setup assistance included\n• Full customer support\n• Quality guaranteed",
         inline=False
     )
-    embed.set_footer(text="ZSupply TB3 • Contact us to complete your order!")
+    embed.set_footer(text="ZSupply • Contact us to complete your order!")
     return embed
-
-# Utility functions
-def check_channel_permissions(channel):
-    """Check if bot has required permissions in a specific channel"""
-    if not channel or not hasattr(channel, 'guild'):
-        return False
-
-    permissions = channel.permissions_for(channel.guild.me)
-    return (permissions.view_channel and 
-            permissions.send_messages and 
-            permissions.embed_links and 
-            permissions.read_message_history)
-
-@bot.event
-async def on_ready():
-    global CHANNELS, GUILD_ANALYSIS
-    load_data()
-
-    # Add persistent views
-    bot.add_view(SupportView())
-    bot.add_view(GangRecruitmentView())
-    bot.add_view(VerifyView())
-    bot.add_view(OrderTicketControlView(None))
-
-    # Sync slash commands
-    try:
-        synced = await bot.tree.sync()
-        print(f"✅ Synced {len(synced)} slash commands")
-    except Exception as e:
-        print(f"❌ Failed to sync commands: {e}")
-
-    print(f'🤖 {bot.user} has connected to Discord!')
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    print('🔍 COMPREHENSIVE AUTO-DETECTION SYSTEM ACTIVATED')
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-    # Comprehensive analysis for each guild
-    for guild in bot.guilds:
-        print(f"\n🏰 ANALYZING GUILD: {guild.name}")
-        print(f"   Guild ID: {guild.id}")
-        print(f"   Members: {guild.member_count}")
-        print("─" * 50)
-
-        # Perform full guild analysis
-        try:
-            analysis = analyze_guild_structure(guild)
-            GUILD_ANALYSIS[guild.id] = analysis
-
-            # Update global channels
-            CHANNELS.update(analysis['channels']['detected_channels'])
-
-            print(f"\n📊 GUILD STATISTICS:")
-            print(f"   📝 Text Channels: {analysis['channels']['total_text']}")
-            print(f"   🔊 Voice Channels: {analysis['channels']['total_voice']}")
-            print(f"   📁 Categories: {analysis['channels']['total_categories']}")
-            print(f"   🎭 Roles: {analysis['roles']['total_roles']}")
-            print(f"   🔰 Boost Tier: {analysis['guild_info']['boost_tier']}")
-            print(f"   🚀 Boost Count: {analysis['guild_info']['boost_count']}")
-
-            if analysis['guild_info']['features']:
-                print(f"   ✨ Features: {', '.join(analysis['guild_info']['features'][:5])}")
-
-            print(f"\n👥 MEMBER HIERARCHY:")
-            owner = analysis['members']['owner']
-            if owner:
-                print(f"   👑 Owner: {owner['name']}")
-            print(f"   🛡️ Admins: {len(analysis['members']['admins'])}")
-            print(f"   🔨 Moderators: {len(analysis['members']['moderators'])}")
-            print(f"   👥 Staff: {len(analysis['members']['staff'])}")
-            print(f"   🤖 Bots: {len(analysis['members']['bots'])}")
-
-            print(f"\n🎯 DETECTED CHANNELS:")
-            detected_channels = analysis['channels']['detected_channels']
-            if detected_channels:
-                for channel_type, channel_id in detected_channels.items():
-                    channel = guild.get_channel(channel_id)
-                    if channel:
-                        perms = "✅" if check_channel_permissions(channel) else "❌"
-                        print(f"   {perms} {channel_type}: #{channel.name}")
-            else:
-                print("   ⚠️ No channels auto-detected")
-                print("   💡 Suggestion: Create channels with descriptive names")
-                print("      Examples: #support, #rules, #announcements, #welcome")
-
-        except Exception as e:
-            print(f"   ⚠️ Error analyzing guild: {e}")
-
-    print("\n" + "━" * 50)
-    print("🚀 SYSTEM INITIALIZATION COMPLETE")
-    print("━" * 50)
-
-    # Auto-setup all embeds in their respective channels
-    await auto_setup_all_embeds()
-
-    print('\n🤖 Pure Discord Bot Running - No Web Interface')
-
-async def auto_setup_all_embeds():
-    """Automatically setup all embeds in their respective channels"""
-    try:
-        # Setup support panel
-        if 'support' in CHANNELS:
-            support_channel = bot.get_channel(CHANNELS['support'])
-            if support_channel and check_channel_permissions(support_channel):
-                try:
-                    embed = create_support_embed()
-                    view = SupportView()
-                    await support_channel.send(embed=embed, view=view)
-                    print("✅ Support panel auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{support_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up support panel: {e}")
-
-        # Setup gang recruitment
-        if 'stk' in CHANNELS:
-            stk_channel = bot.get_channel(CHANNELS['stk'])
-            if stk_channel and check_channel_permissions(stk_channel):
-                try:
-                    embed = create_gang_embed()
-                    view = GangRecruitmentView()
-                    await stk_channel.send(embed=embed, view=view)
-                    print("✅ Gang recruitment panel auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{stk_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up gang recruitment: {e}")
-
-        # Setup ToS
-        if 'tos' in CHANNELS:
-            tos_channel = bot.get_channel(CHANNELS['tos'])
-            if tos_channel and check_channel_permissions(tos_channel):
-                try:
-                    embed = create_tos_embed()
-                    await tos_channel.send(embed=embed)
-                    print("✅ Terms of Service auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{tos_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up ToS: {e}")
-
-        # Setup Rules
-        if 'rules' in CHANNELS:
-            rules_channel = bot.get_channel(CHANNELS['rules'])
-            if rules_channel and check_channel_permissions(rules_channel):
-                try:
-                    embed = create_rules_embed()
-                    await rules_channel.send(embed=embed)
-                    print("✅ Server rules auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{rules_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up rules: {e}")
-
-        # Setup News
-        if 'news' in CHANNELS:
-            news_channel = bot.get_channel(CHANNELS['news'])
-            if news_channel and check_channel_permissions(news_channel):
-                try:
-                    if not NEWS_DATA["last_updated"]:
-                        NEWS_DATA["last_updated"] = datetime.now().isoformat()
-                        save_data()
-                    print("✅ News channel detected")
-                except Exception as e:
-                    print(f"❌ Error with news setup: {e}")
-
-    except Exception as e:
-        print(f"Error in auto-setup: {e}")
-
-# Function to delete duplicate bot messages
-async def delete_duplicate_shop_messages(channel, new_message):
-    """Delete duplicate shop messages from bot in the same channel"""
-    try:
-        # Check last 20 messages for duplicates
-        async for message in channel.history(limit=20):
-            if (message.author.id == bot.user.id and 
-                message.id != new_message.id and 
-                message.embeds and new_message.embeds):
-                # Check if both messages have shop embeds with same title
-                old_title = message.embeds[0].title if message.embeds[0].title else ""
-                new_title = new_message.embeds[0].title if new_message.embeds[0].title else ""
-
-                # If both are shop embeds, delete the older one
-                if any(shop in old_title for shop in ["Bronx 3", "Philly Streets 2", "South Bronx", "Roblox Alts"]) and \
-                   any(shop in new_title for shop in ["Bronx 3", "Philly Streets 2", "South Bronx", "Roblox Alts"]):
-                    try:
-                        await message.delete()
-                        print(f"🗑️ Deleted duplicate shop message in #{channel.name}")
-                    except discord.NotFound:
-                        pass  # Message already deleted
-                    except discord.Forbidden:
-                        pass  # No permission to delete
-                    break
-    except Exception as e:
-        print(f"⚠️ Error checking for duplicates: {e}")
-
-# Slash commands for spawning shops
-@bot.tree.command(name="spawn_tb3", description="Spawn The Bronx 3 shop")
-async def spawn_tb3(interaction: discord.Interaction):
-    """Spawn The Bronx 3 shop interface"""
-    try:
-        embed = create_main_shop_embed()
-        view = MainShopView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning TB3 shop: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_ps", description="Spawn Philly Streets 2 shop")
-async def spawn_ps(interaction: discord.Interaction):
-    """Spawn Philly Streets 2 shop interface"""
-    try:
-        embed = create_philly_shop_embed()
-        view = PhillyShopView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning PS2 shop: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_sb", description="Spawn South Bronx The Trenches shop")
-async def spawn_sb(interaction: discord.Interaction):
-    """Spawn South Bronx The Trenches shop interface"""
-    try:
-        embed = create_south_bronx_shop_embed()
-        view = SouthBronxShopView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning SB shop: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_roblox", description="Spawn Roblox Alts shop")
-async def spawn_roblox(interaction: discord.Interaction):
-    """Spawn Roblox Alts shop interface"""
-    try:
-        embed = create_roblox_alts_embed()
-        view = RobloxAltsView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning Roblox shop: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_support", description="Spawn support ticket panel")
-async def spawn_support(interaction: discord.Interaction):
-    """Spawn support ticket interface"""
-    try:
-        embed = create_support_embed()
-        view = SupportView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning support panel: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_gang", description="Spawn gang recruitment panel")
-async def spawn_gang(interaction: discord.Interaction):
-    """Spawn gang recruitment interface"""
-    try:
-        embed = create_gang_embed()
-        view = GangRecruitmentView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning gang panel: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_tos", description="Spawn Terms of Service")
-async def spawn_tos(interaction: discord.Interaction):
-    """Spawn Terms of Service embed"""
-    try:
-        embed = create_tos_embed()
-        await interaction.response.send_message(embed=embed)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning TOS: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_rules", description="Spawn server rules")
-async def spawn_rules(interaction: discord.Interaction):
-    """Spawn server rules embed"""
-    try:
-        embed = create_rules_embed()
-        await interaction.response.send_message(embed=embed)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning rules: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_welcome", description="Spawn welcome message")
-async def spawn_welcome(interaction: discord.Interaction):
-    """Spawn welcome message embed"""
-    try:
-        embed = create_welcome_embed()
-        await interaction.response.send_message(embed=embed)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning welcome: {e}", ephemeral=True)
-
-@bot.tree.command(name="news", description="Spawn news update")
-async def news(interaction: discord.Interaction, title: str = None, content: str = None):
-    """Spawn news update in the news channel"""
-    try:
-        news_channel_id = 1407347202329940000
-        news_channel = bot.get_channel(news_channel_id)
-
-        if not news_channel:
-            await interaction.response.send_message("❌ News channel not found!", ephemeral=True)
-            return
-
-        # Use provided content or default news
-        news_title = title or "📰 Latest News Update"
-        news_content = content or "Stay tuned for important announcements and updates!"
-
-        embed = discord.Embed(
-            title=news_title,
-            description=news_content,
-            color=0xff6b6b,
-            timestamp=datetime.now()
-        )
-        embed.add_field(
-            name="📢 Important Information",
-            value="• Check back regularly for updates\n• Follow server announcements\n• Contact support if you have questions",
-            inline=False
-        )
-        embed.set_footer(text="ZSells News • Stay informed")
-
-        # Send to news channel
-        await news_channel.send(embed=embed)
-        await interaction.response.send_message(f"✅ News posted in {news_channel.mention}!", ephemeral=True)
-
-        # Update news data
-        global NEWS_DATA
-        NEWS_DATA = {
-            "title": news_title,
-            "content": news_content,
-            "last_updated": datetime.now().isoformat()
-        }
-        save_data()
-
-    except Exception as e:
-        await interaction.response.send_message(f"Error posting news: {e}", ephemeral=True)
-
-@bot.tree.command(name="spawn_verify", description="Spawn verification panel")
-async def spawn_verify(interaction: discord.Interaction):
-    """Spawn server verification panel"""
-    try:
-        embed = create_verify_embed()
-        view = VerifyView()
-        await interaction.response.send_message(embed=embed, view=view)
-
-        # Delete duplicates after sending
-        if interaction.followup:
-            try:
-                message = await interaction.original_response()
-                await delete_duplicate_shop_messages(interaction.channel, message)
-            except:
-                pass
-    except Exception as e:
-        await interaction.response.send_message(f"Error spawning verify panel: {e}", ephemeral=True)
-
-@bot.tree.command(name="reminder", description="Set a reminder")
-async def reminder(interaction: discord.Interaction, time: str, message: str):
-    """Set a reminder for a specific time"""
-    try:
-        import re
-
-        # Parse time (simple format: 5m, 1h, 30s)
-        time_pattern = r'^(\d+)([smh])$'
-        match = re.match(time_pattern, time.lower())
-
-        if not match:
-            await interaction.response.send_message("❌ Invalid time format! Use: 30s, 5m, 1h", ephemeral=True)
-            return
-
-        duration = int(match.group(1))
-        unit = match.group(2)
-
-        # Convert to seconds
-        if unit == 's':
-            seconds = duration
-        elif unit == 'm':
-            seconds = duration * 60
-        elif unit == 'h':
-            seconds = duration * 3600
-
-        if seconds > 86400:  # Max 24 hours
-            await interaction.response.send_message("❌ Maximum reminder time is 24 hours!", ephemeral=True)
-            return
-
-        # Create reminder embed
-        embed = discord.Embed(
-            title="⏰ Reminder Set",
-            description=f"I'll remind you in **{time}** about:\n\n*{message}*",
-            color=0x00ff00,
-            timestamp=datetime.now()
-        )
-        embed.set_footer(text="ZSupply Reminder System")
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-        # Wait and send reminder
-        await asyncio.sleep(seconds)
-
-        reminder_embed = discord.Embed(
-            title="🔔 Reminder",
-            description=f"**You asked me to remind you:**\n\n*{message}*",
-            color=0xff9500,
-            timestamp=datetime.now()
-        )
-        reminder_embed.set_footer(text="ZSupply Reminder System")
-
-        try:
-            await interaction.followup.send(f"{interaction.user.mention}", embed=reminder_embed)
-        except:
-            # Fallback to DM if followup fails
-            try:
-                await interaction.user.send(embed=reminder_embed)
-            except:
-                pass  # User has DMs disabled
-
-    except Exception as e:
-        await interaction.response.send_message(f"Error setting reminder: {e}", ephemeral=True)
 
 # Create missing embed functions
 def create_support_embed():
@@ -2748,15 +1832,414 @@ class ContinueVerifyView(discord.ui.View):
         modal = VerifyModal(self.verification_code)
         await interaction.response.send_modal(modal)
 
-# Sync slash commands on ready
+# Utility functions
+def check_channel_permissions(channel):
+    """Check if bot has required permissions in a specific channel"""
+    if not channel or not hasattr(channel, 'guild'):
+        return False
+
+    permissions = channel.permissions_for(channel.guild.me)
+    return (permissions.view_channel and
+            permissions.send_messages and
+            permissions.embed_links and
+            permissions.read_message_history)
+
 @bot.event
-async def on_ready_sync():
-    """Sync slash commands when bot is ready"""
+async def on_ready():
+    global CHANNELS, GUILD_ANALYSIS
+    load_data()
+
+    # Add persistent views
+    bot.add_view(SupportView())
+    bot.add_view(GangRecruitmentView())
+    bot.add_view(VerifyView())
+    bot.add_view(OrderTicketControlView(None))
+
+    # Sync slash commands
     try:
         synced = await bot.tree.sync()
         print(f"✅ Synced {len(synced)} slash commands")
     except Exception as e:
         print(f"❌ Failed to sync commands: {e}")
+
+    print(f'🤖 {bot.user} has connected to Discord!')
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    print('🔍 COMPREHENSIVE AUTO-DETECTION SYSTEM ACTIVATED')
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+
+    # Comprehensive analysis for each guild
+    for guild in bot.guilds:
+        print(f"\n🏰 ANALYZING GUILD: {guild.name}")
+        print(f"   Guild ID: {guild.id}")
+        print(f"   Members: {guild.member_count}")
+        print("─" * 50)
+
+        # Perform full guild analysis
+        try:
+            analysis = analyze_guild_structure(guild)
+            GUILD_ANALYSIS[guild.id] = analysis
+
+            # Update global channels
+            CHANNELS.update(analysis['channels']['detected_channels'])
+
+            print(f"\n📊 GUILD STATISTICS:")
+            print(f"   📝 Text Channels: {analysis['channels']['total_text']}")
+            print(f"   🔊 Voice Channels: {analysis['channels']['total_voice']}")
+            print(f"   📁 Categories: {analysis['channels']['total_categories']}")
+            print(f"   🎭 Roles: {analysis['roles']['total_roles']}")
+            print(f"   🔰 Boost Tier: {analysis['guild_info']['boost_tier']}")
+            print(f"   🚀 Boost Count: {analysis['guild_info']['boost_count']}")
+
+            if analysis['guild_info']['features']:
+                print(f"   ✨ Features: {', '.join(analysis['guild_info']['features'][:5])}")
+
+            print(f"\n👥 MEMBER HIERARCHY:")
+            owner = analysis['members']['owner']
+            if owner:
+                print(f"   👑 Owner: {owner['name']}")
+            print(f"   🛡️ Admins: {len(analysis['members']['admins'])}")
+            print(f"   🔨 Moderators: {len(analysis['members']['moderators'])}")
+            print(f"   👥 Staff: {len(analysis['members']['staff'])}")
+            print(f"   🤖 Bots: {len(analysis['members']['bots'])}")
+
+            print(f"\n🎯 DETECTED CHANNELS:")
+            detected_channels = analysis['channels']['detected_channels']
+            if detected_channels:
+                for channel_type, channel_id in detected_channels.items():
+                    channel = guild.get_channel(channel_id)
+                    if channel:
+                        perms = "✅" if check_channel_permissions(channel) else "❌"
+                        print(f"   {perms} {channel_type}: #{channel.name}")
+            else:
+                print("   ⚠️ No channels auto-detected")
+                print("   💡 Suggestion: Create channels with descriptive names")
+                print("      Examples: #support, #rules, #announcements, #welcome")
+
+        except Exception as e:
+            print(f"   ⚠️ Error analyzing guild: {e}")
+
+    print("\n" + "━" * 50)
+    print("🚀 SYSTEM INITIALIZATION COMPLETE")
+    print("━" * 50)
+
+    # Auto-setup all embeds in their respective channels
+    await auto_setup_all_embeds()
+
+    print('\n🤖 Pure Discord Bot Running - No Web Interface')
+
+async def auto_setup_all_embeds():
+    """Automatically setup all embeds in their respective channels"""
+    try:
+        # Setup support panel
+        if 'support' in CHANNELS:
+            support_channel = bot.get_channel(CHANNELS['support'])
+            if support_channel and check_channel_permissions(support_channel):
+                try:
+                    embed = create_support_embed()
+                    view = SupportView()
+                    await support_channel.send(embed=embed, view=view)
+                    print("✅ Support panel auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{support_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up support panel: {e}")
+
+        # Setup gang recruitment
+        if 'stk' in CHANNELS:
+            stk_channel = bot.get_channel(CHANNELS['stk'])
+            if stk_channel and check_channel_permissions(stk_channel):
+                try:
+                    embed = create_gang_embed()
+                    view = GangRecruitmentView()
+                    await stk_channel.send(embed=embed, view=view)
+                    print("✅ Gang recruitment panel auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{stk_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up gang recruitment: {e}")
+
+        # Setup ToS
+        if 'tos' in CHANNELS:
+            tos_channel = bot.get_channel(CHANNELS['tos'])
+            if tos_channel and check_channel_permissions(tos_channel):
+                try:
+                    embed = create_tos_embed()
+                    await tos_channel.send(embed=embed)
+                    print("✅ Terms of Service auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{tos_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up ToS: {e}")
+
+        # Setup Rules
+        if 'rules' in CHANNELS:
+            rules_channel = bot.get_channel(CHANNELS['rules'])
+            if rules_channel and check_channel_permissions(rules_channel):
+                try:
+                    embed = create_rules_embed()
+                    await rules_channel.send(embed=embed)
+                    print("✅ Server rules auto-setup complete!")
+                except discord.Forbidden:
+                    print(f"❌ No permission to send messages in #{rules_channel.name}")
+                except Exception as e:
+                    print(f"❌ Error setting up rules: {e}")
+
+        # Setup News
+        if 'news' in CHANNELS:
+            news_channel = bot.get_channel(CHANNELS['news'])
+            if news_channel and check_channel_permissions(news_channel):
+                try:
+                    if not NEWS_DATA["last_updated"]:
+                        NEWS_DATA["last_updated"] = datetime.now().isoformat()
+                        save_data()
+                    print("✅ News channel detected")
+                except Exception as e:
+                    print(f"❌ Error with news setup: {e}")
+
+    except Exception as e:
+        print(f"Error in auto-setup: {e}")
+
+# Function to delete duplicate bot messages
+async def delete_duplicate_shop_messages(channel, new_message):
+    """Delete duplicate shop messages from bot in the same channel"""
+    try:
+        # Check last 20 messages for duplicates
+        async for message in channel.history(limit=20):
+            if (message.author.id == bot.user.id and
+                message.id != new_message.id and
+                message.embeds and new_message.embeds):
+                # Check if both messages have shop embeds with same title
+                old_title = message.embeds[0].title if message.embeds[0].title else ""
+                new_title = new_message.embeds[0].title if new_message.embeds[0].title else ""
+
+                # If both are shop embeds, delete the older one
+                if any(shop in old_title for shop in ["Bronx 3", "Philly Streets 2", "South Bronx", "Roblox Alts"]) and \
+                   any(shop in new_title for shop in ["Bronx 3", "Philly Streets 2", "South Bronx", "Roblox Alts"]):
+                    try:
+                        await message.delete()
+                        print(f"🗑️ Deleted duplicate shop message in #{channel.name}")
+                    except discord.NotFound:
+                        pass  # Message already deleted
+                    except discord.Forbidden:
+                        pass  # No permission to delete
+                    break
+    except Exception as e:
+        print(f"⚠️ Error checking for duplicates: {e}")
+
+# Slash commands for spawning shops
+@bot.tree.command(name="spawn_tb3", description="Spawn The Bronx 3 shop")
+async def spawn_tb3(interaction: discord.Interaction):
+    """Spawn The Bronx 3 shop interface"""
+    try:
+        embed = create_main_shop_embed()
+        view = MainShopView()
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning TB3 shop: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_ps", description="Spawn Philly Streets 2 shop")
+async def spawn_ps(interaction: discord.Interaction):
+    """Spawn Philly Streets 2 shop interface"""
+    try:
+        embed = create_philly_shop_embed()
+        view = PhillyShopView(show_back=False)
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning PS2 shop: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_sb", description="Spawn South Bronx The Trenches shop")
+async def spawn_sb(interaction: discord.Interaction):
+    """Spawn South Bronx The Trenches shop interface"""
+    try:
+        embed = create_south_bronx_shop_embed()
+        view = SouthBronxShopView(show_back=False)
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning SB shop: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_roblox", description="Spawn Roblox Alts shop")
+async def spawn_roblox(interaction: discord.Interaction):
+    """Spawn Roblox Alts shop interface"""
+    try:
+        embed = create_roblox_alts_embed()
+        view = RobloxAltsView()
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning Roblox shop: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_support", description="Spawn support ticket panel")
+async def spawn_support(interaction: discord.Interaction):
+    """Spawn support ticket interface"""
+    try:
+        embed = create_support_embed()
+        view = SupportView()
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning support panel: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_gang", description="Spawn gang recruitment panel")
+async def spawn_gang(interaction: discord.Interaction):
+    """Spawn gang recruitment interface"""
+    try:
+        embed = create_gang_embed()
+        view = GangRecruitmentView()
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning gang panel: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_tos", description="Spawn Terms of Service")
+async def spawn_tos(interaction: discord.Interaction):
+    """Spawn Terms of Service embed"""
+    try:
+        embed = create_tos_embed()
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning TOS: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_rules", description="Spawn server rules")
+async def spawn_rules(interaction: discord.Interaction):
+    """Spawn server rules embed"""
+    try:
+        embed = create_rules_embed()
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning rules: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_welcome", description="Spawn welcome message")
+async def spawn_welcome(interaction: discord.Interaction):
+    """Spawn welcome message embed"""
+    try:
+        embed = create_welcome_embed()
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning welcome: {e}", ephemeral=True)
+
+@bot.tree.command(name="news", description="Spawn news update")
+async def news(interaction: discord.Interaction, title: str = None, content: str = None):
+    """Spawn news update in the news channel"""
+    try:
+        news_channel_id = 1407347202329940000
+        news_channel = bot.get_channel(news_channel_id)
+
+        if not news_channel:
+            await interaction.response.send_message("❌ News channel not found!", ephemeral=True)
+            return
+
+        # Use provided content or default news
+        news_title = title or "📰 Latest News Update"
+        news_content = content or "Stay tuned for important announcements and updates!"
+
+        embed = discord.Embed(
+            title=news_title,
+            description=news_content,
+            color=0xff6b6b,
+            timestamp=datetime.now()
+        )
+        embed.add_field(
+            name="📢 Important Information",
+            value="• Check back regularly for updates\n• Follow server announcements\n• Contact support if you have questions",
+            inline=False
+        )
+        embed.set_footer(text="ZSells News • Stay informed")
+
+        # Send to news channel
+        await news_channel.send(embed=embed)
+        await interaction.response.send_message(f"✅ News posted in {news_channel.mention}!", ephemeral=True)
+
+        # Update news data
+        global NEWS_DATA
+        NEWS_DATA = {
+            "title": news_title,
+            "content": news_content,
+            "last_updated": datetime.now().isoformat()
+        }
+        save_data()
+
+    except Exception as e:
+        await interaction.response.send_message(f"Error posting news: {e}", ephemeral=True)
+
+@bot.tree.command(name="spawn_verify", description="Spawn verification panel")
+async def spawn_verify(interaction: discord.Interaction):
+    """Spawn server verification panel"""
+    try:
+        embed = create_verify_embed()
+        view = VerifyView()
+        await interaction.response.send_message(embed=embed, view=view)
+    except Exception as e:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(f"Error spawning verify panel: {e}", ephemeral=True)
+
+@bot.tree.command(name="reminder", description="Set a reminder")
+async def reminder(interaction: discord.Interaction, time: str, message: str):
+    """Set a reminder for a specific time"""
+    try:
+        import re
+
+        # Parse time (simple format: 5m, 1h, 30s)
+        time_pattern = r'^(\d+)([smh])$'
+        match = re.match(time_pattern, time.lower())
+
+        if not match:
+            await interaction.response.send_message("❌ Invalid time format! Use: 30s, 5m, 1h", ephemeral=True)
+            return
+
+        duration = int(match.group(1))
+        unit = match.group(2)
+
+        # Convert to seconds
+        if unit == 's':
+            seconds = duration
+        elif unit == 'm':
+            seconds = duration * 60
+        elif unit == 'h':
+            seconds = duration * 3600
+
+        if seconds > 86400:  # Max 24 hours
+            await interaction.response.send_message("❌ Maximum reminder time is 24 hours!", ephemeral=True)
+            return
+
+        # Create reminder embed
+        embed = discord.Embed(
+            title="⏰ Reminder Set",
+            description=f"I'll remind you in **{time}** about:\n\n*{message}*",
+            color=0x00ff00,
+            timestamp=datetime.now()
+        )
+        embed.set_footer(text="ZSupply Reminder System")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        # Wait and send reminder
+        await asyncio.sleep(seconds)
+
+        reminder_embed = discord.Embed(
+            title="🔔 Reminder",
+            description=f"**You asked me to remind you:**\n\n*{message}*",
+            color=0xff9500,
+            timestamp=datetime.now()
+        )
+        reminder_embed.set_footer(text="ZSupply Reminder System")
+
+        try:
+            await interaction.followup.send(f"{interaction.user.mention}", embed=reminder_embed)
+        except:
+            # Fallback to DM if followup fails
+            try:
+                await interaction.user.send(embed=reminder_embed)
+            except:
+                pass  # User has DMs disabled
+
+    except Exception as e:
+        await interaction.response.send_message(f"Error setting reminder: {e}", ephemeral=True)
 
 # Run the bot
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
