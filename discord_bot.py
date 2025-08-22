@@ -858,45 +858,49 @@ class MoneyView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label='Add Regular Money - $1.00', style=discord.ButtonStyle.primary, emoji='💵')
-    async def regular_money(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Max Money 990k", 1.00, "The Bronx 3")
-        embed = discord.Embed(
-            title="✅ Added to Cart!",
-            description="**Max Money 990k** added to cart!\n\n**Added:** $1.00",
-            color=0x00ff00
-        )
-        await interaction.response.send_message(embed=embed, view=AddedToCartView("money"), ephemeral=True)
+    @discord.ui.select(
+        placeholder="Select money service...",
+        options=[
+            discord.SelectOption(label="Max Money 990k - $1.00", value="regular_money", emoji="💵", description="Regular money service"),
+            discord.SelectOption(label="Max Bank 990k - $1.00", value="regular_bank", emoji="🏦", description="Regular bank service"),
+            discord.SelectOption(label="Max Money 1.6M - $2.00", value="gamepass_money", emoji="💎", description="Requires Extra Money Pass"),
+            discord.SelectOption(label="Max Bank 1.6M - $2.00", value="gamepass_bank", emoji="💳", description="Requires Extra Bank Pass")
+        ],
+        min_values=1,
+        max_values=1
+    )
+    async def money_service_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        selected_service = select.values[0]
 
-    @discord.ui.button(label='Add Regular Bank - $1.00', style=discord.ButtonStyle.primary, emoji='🏦')
-    async def regular_bank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Max Bank 990k", 1.00, "The Bronx 3")
-        embed = discord.Embed(
-            title="✅ Added to Cart!",
-            description="**Max Bank 990k** added to cart!\n\n**Added:** $1.00",
-            color=0x00ff00
-        )
-        await interaction.response.send_message(embed=embed, view=AddedToCartView("money"), ephemeral=True)
+        service_data = {
+            "regular_money": {"name": "Max Money 990k", "price": 1.00, "description": "Regular money service"},
+            "regular_bank": {"name": "Max Bank 990k", "price": 1.00, "description": "Regular bank service"},
+            "gamepass_money": {"name": "Max Money 1.6M (Extra Money Pass)", "price": 2.00, "description": "Requires Extra Money Pass"},
+            "gamepass_bank": {"name": "Max Bank 1.6M (Extra Bank Pass)", "price": 2.00, "description": "Requires Extra Bank Pass"}
+        }
 
-    @discord.ui.button(label='Add Gamepass Money - $2.00', style=discord.ButtonStyle.success, emoji='💎')
-    async def gamepass_money(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Max Money 1.6M (Extra Money Pass)", 2.00, "The Bronx 3")
-        embed = discord.Embed(
-            title="✅ Added to Cart!",
-            description="**Max Money 1.6M (Extra Money Pass)** added to cart!\n\n**Added:** $2.00",
-            color=0x00ff00
-        )
-        await interaction.response.send_message(embed=embed, view=AddedToCartView("money"), ephemeral=True)
+        service = service_data[selected_service]
 
-    @discord.ui.button(label='Add Gamepass Bank - $2.00', style=discord.ButtonStyle.success, emoji='💳')
-    async def gamepass_bank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "Max Bank 1.6M (Extra Bank Pass)", 2.00, "The Bronx 3")
+        # Create confirmation embed
         embed = discord.Embed(
-            title="✅ Added to Cart!",
-            description="**Max Bank 1.6M (Extra Bank Pass)** added to cart!\n\n**Added:** $2.00",
-            color=0x00ff00
+            title="💰 Confirm Your Order",
+            description=f"**Selected Service:** {service['name']}\n**Price:** ${service['price']:.2f}\n\nReady to add to cart?",
+            color=0x3498db,
+            timestamp=datetime.now()
         )
-        await interaction.response.send_message(embed=embed, view=AddedToCartView("money"), ephemeral=True)
+        embed.add_field(
+            name="📦 Service Details",
+            value=f"**Product:** TB3 Money\n**Service:** {service['name']}\n**Price:** ${service['price']:.2f}\n**Description:** {service['description']}",
+            inline=True
+        )
+        embed.add_field(
+            name="🚀 What's Included",
+            value="✅ Instant delivery\n✅ Safe transfer\n✅ Setup support\n✅ Money guarantee",
+            inline=True
+        )
+        embed.set_footer(text="ZSupply TB3 Money • Confirm to add to cart")
+
+        await interaction.response.send_message(embed=embed, view=TB3MoneyConfirmView(service['name'], service['price']), ephemeral=True)
 
     @discord.ui.button(label='Back', style=discord.ButtonStyle.secondary, emoji='⬅️')
     async def back_to_bronx3(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1303,6 +1307,52 @@ class PhillyMoneyConfirmView(discord.ui.View):
     async def back_to_philly_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(embed=create_philly_shop_embed(), view=PhillyShopView(), ephemeral=True)
 
+class TB3MoneyConfirmView(discord.ui.View):
+    def __init__(self, service_name, price):
+        super().__init__(timeout=None)
+        self.service_name = service_name
+        self.price = price
+
+    @discord.ui.button(label='Add to Cart', style=discord.ButtonStyle.success, emoji='🛒')
+    async def confirm_add_to_cart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        add_to_cart(interaction.user.id, self.service_name, self.price, "The Bronx 3")
+        embed = discord.Embed(
+            title="✅ Added to Cart!",
+            description=f"**{self.service_name}** added to cart!\n\n**Added:** ${self.price:.2f}",
+            color=0x00ff00
+        )
+        await interaction.response.send_message(embed=embed, view=AddedToCartView("money"), ephemeral=True)
+
+    @discord.ui.button(label='Select Different Service', style=discord.ButtonStyle.primary, emoji='🔄')
+    async def select_different_service(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(embed=create_money_embed(), view=MoneyView(), ephemeral=True)
+
+    @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
+    async def back_to_tb3_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(embed=create_main_shop_embed(), view=MainShopView(), ephemeral=True)
+
+class SouthBronxConfirmView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label='Add to Cart', style=discord.ButtonStyle.success, emoji='🛒')
+    async def confirm_add_to_cart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        add_to_cart(interaction.user.id, "South Bronx Modded Account (1.750M Clean + 1.750M Bank + Lucky Weapons)", 3.00, "South Bronx The Trenches")
+        embed = discord.Embed(
+            title="✅ Added to Cart!",
+            description="**South Bronx Modded Account** added to cart!\n\n**Added:** $3.00",
+            color=0x00ff00
+        )
+        await interaction.response.send_message(embed=embed, view=AddedToCartView("sb_account"), ephemeral=True)
+
+    @discord.ui.button(label='Select Different Account', style=discord.ButtonStyle.primary, emoji='🔄')
+    async def select_different_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView(), ephemeral=True)
+
+    @discord.ui.button(label='Back to Shop', style=discord.ButtonStyle.secondary, emoji='🏠')
+    async def back_to_sb_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(embed=create_south_bronx_shop_embed(), view=SouthBronxShopView(), ephemeral=True)
+
 def create_philly_special_embed():
     embed = discord.Embed(
         title="⭐ Philly Streets 2 - Special Items",
@@ -1392,15 +1442,38 @@ class SouthBronxShopView(discord.ui.View):
         back_button.callback = back_callback
         return back_button
 
-    @discord.ui.button(label='South Bronx Modded Account - $3.00', style=discord.ButtonStyle.success, emoji='🎮')
-    async def sb_modded_account_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        add_to_cart(interaction.user.id, "South Bronx Modded Account (1.750M Clean + 1.750M Bank + Lucky Weapons)", 3.00, "South Bronx The Trenches")
-        embed = discord.Embed(
-            title="✅ Added to Cart!",
-            description="**South Bronx Modded Account** added to cart!\n\n**Added:** $3.00",
-            color=0x00ff00
-        )
-        await interaction.response.send_message(embed=embed, view=AddedToCartView("sb_account"), ephemeral=True)
+    @discord.ui.select(
+        placeholder="Select account package...",
+        options=[
+            discord.SelectOption(label="South Bronx Modded Account - $3.00", value="sb_modded", emoji="🎮", description="200+ days old with 1.750M Clean + 1.750M Bank + Lucky Weapons")
+        ],
+        min_values=1,
+        max_values=1
+    )
+    async def account_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        selected_account = select.values[0]
+
+        if selected_account == "sb_modded":
+            # Create confirmation embed
+            embed = discord.Embed(
+                title="🎮 Confirm Your Order",
+                description="**Selected Account:** South Bronx Modded Account\n**Price:** $3.00\n\nReady to add to cart?",
+                color=0x3498db,
+                timestamp=datetime.now()
+            )
+            embed.add_field(
+                name="📦 Account Details",
+                value="**Age:** 200+ Days Old\n**Clean Money:** 1.750M\n**Bank Money:** 1.750M\n**Bonus:** Lucky Weapons",
+                inline=True
+            )
+            embed.add_field(
+                name="🚀 What's Included",
+                value="✅ Account credentials\n✅ Setup instructions\n✅ 24/7 support\n✅ Quality guarantee",
+                inline=True
+            )
+            embed.set_footer(text="ZSupply South Bronx • Confirm to add to cart")
+
+            await interaction.response.send_message(embed=embed, view=SouthBronxConfirmView(), ephemeral=True)
 
     @discord.ui.button(label='View Cart', style=discord.ButtonStyle.primary, emoji='🛒')
     async def view_cart_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1446,17 +1519,46 @@ class RobloxAltsView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label='TB3 Modded Account', style=discord.ButtonStyle.primary, emoji='🗽')
-    async def tb3_account(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(embed=create_roblox_account_info_embed("The Bronx 3"), view=RobloxOrderView("TB3"), ephemeral=True)
+    @discord.ui.select(
+        placeholder="Select game account...",
+        options=[
+            discord.SelectOption(label="TB3 Modded Account - $3.00", value="TB3", emoji="🗽", description="The Bronx 3 premium account"),
+            discord.SelectOption(label="Philly Streets 2 Account - $3.00", value="Philly", emoji="🦅", description="Philly Streets 2 premium account"),
+            discord.SelectOption(label="South Bronx Account - $3.00", value="South Bronx", emoji="🔥", description="South Bronx The Trenches premium account")
+        ],
+        min_values=1,
+        max_values=1
+    )
+    async def game_account_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        selected_game = select.values[0]
 
-    @discord.ui.button(label='Philly Streets 2 Account', style=discord.ButtonStyle.success, emoji='🦅')
-    async def philly_account(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(embed=create_roblox_account_info_embed("Philly Streets 2"), view=RobloxOrderView("Philly"), ephemeral=True)
+        game_names = {
+            "TB3": "The Bronx 3",
+            "Philly": "Philly Streets 2",
+            "South Bronx": "South Bronx The Trenches"
+        }
+        game_name = game_names.get(selected_game, selected_game)
 
-    @discord.ui.button(label='South Bronx Account', style=discord.ButtonStyle.danger, emoji='🔥')
-    async def south_bronx_account(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(embed=create_roblox_account_info_embed("South Bronx The Trenches"), view=RobloxOrderView("South Bronx"), ephemeral=True)
+        # Create confirmation embed
+        embed = discord.Embed(
+            title=f"🎮 {game_name} - Premium Account",
+            description=f"**Selected Account:** Premium {game_name} Account\n**Price:** $3.00\n\nReady to add to cart?",
+            color=0x3498db,
+            timestamp=datetime.now()
+        )
+        embed.add_field(
+            name="🔥 Account Specifications",
+            value=f"**Age:** 200+ Days Old\n**Game:** {game_name}\n**Status:** Fully Stacked\n**Price:** $3.00",
+            inline=True
+        )
+        embed.add_field(
+            name="📦 What You Get",
+            value="✅ Account Username & Password\n✅ Stacked money & items\n✅ Setup guide\n✅ 24/7 customer support",
+            inline=True
+        )
+        embed.set_footer(text="ZSupply Roblox Alts • Confirm to add to cart")
+
+        await interaction.response.send_message(embed=embed, view=RobloxAccountConfirmView(selected_game, game_name), ephemeral=True)
 
     @discord.ui.button(label='Back to Shop Selection', style=discord.ButtonStyle.secondary, emoji='🏠')
     async def back_to_shop_selection(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -1501,6 +1603,32 @@ def create_roblox_account_info_embed(game_name):
     embed.set_footer(text="ZSupply • Premium Quality")
     return embed
 
+class RobloxAccountConfirmView(discord.ui.View):
+    def __init__(self, game_type, game_name):
+        super().__init__(timeout=None)
+        self.game_type = game_type
+        self.game_name = game_name
+
+    @discord.ui.button(label='Add to Cart', style=discord.ButtonStyle.success, emoji='🛒')
+    async def confirm_add_to_cart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        price = 3.00
+        add_to_cart(interaction.user.id, f"Premium {self.game_name} Account (200+ Days Old - Max Money Only)", price, f"Roblox Alts - {self.game_name}")
+
+        embed = discord.Embed(
+            title="✅ Added to Cart!",
+            description=f"**Premium {self.game_name} Account (Max Money Only)** added to cart!\n\n**Added:** ${price:.2f}",
+            color=0x00ff00
+        )
+        await interaction.response.send_message(embed=embed, view=AddedToCartView("roblox_account"), ephemeral=True)
+
+    @discord.ui.button(label='Select Different Account', style=discord.ButtonStyle.primary, emoji='🔄')
+    async def select_different_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(embed=create_roblox_alts_embed(), view=RobloxAltsView(), ephemeral=True)
+
+    @discord.ui.button(label='Back to Roblox Shop', style=discord.ButtonStyle.secondary, emoji='🎮')
+    async def back_to_roblox_shop(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(embed=create_roblox_alts_embed(), view=RobloxAltsView(), ephemeral=True)
+
 class RobloxOrderView(discord.ui.View):
     def __init__(self, game_type):
         super().__init__(timeout=None)
@@ -1518,11 +1646,11 @@ class RobloxOrderView(discord.ui.View):
         # Set price based on game
         price = 3.00
 
-        add_to_cart(interaction.user.id, f"Premium {game_name} Account (200+ Days Old)", price, f"Roblox Alts - {game_name}")
+        add_to_cart(interaction.user.id, f"Premium {game_name} Account (200+ Days Old - Max Money Only)", price, f"Roblox Alts - {game_name}")
 
         embed = discord.Embed(
             title="✅ Added to Cart!",
-            description=f"**Premium {game_name} Account** added to cart!\n\n**Added:** ${price:.2f}",
+            description=f"**Premium {game_name} Account (Max Money Only)** added to cart!\n\n**Added:** ${price:.2f}",
             color=0x00ff00
         )
         await interaction.response.send_message(embed=embed, view=AddedToCartView("roblox_account"), ephemeral=True)
