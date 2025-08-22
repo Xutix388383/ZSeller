@@ -1942,117 +1942,7 @@ def create_welcome_embed():
     embed.set_footer(text="ZSells Community • Your premium gaming destination!")
     return embed
 
-def create_verify_embed():
-    embed = discord.Embed(
-        title="🛡️ Server Verification",
-        description="**Welcome to the server!**\n\nTo access all channels and features, you need to complete verification.",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="📋 How to verify:",
-        value="1. Click the Verify button below\n2. Copy the verification code shown\n3. Enter the code in the modal\n4. Submit to complete verification",
-        inline=False
-    )
-    embed.add_field(
-        name="🎯 What happens after verification?",
-        value="• Access to all server channels\n• Ability to participate in discussions\n• Full server permissions\n• Welcome to the community!",
-        inline=False
-    )
-    embed.set_footer(text="ZSells Verification • Click below to verify")
-    return embed
 
-class VerifyModal(discord.ui.Modal, title='Server Verification'):
-    def __init__(self, verification_code):
-        super().__init__()
-        self.verification_code = verification_code
-
-    code_input = discord.ui.TextInput(
-        label='Enter Verification Code',
-        placeholder='Enter the code shown above...',
-        style=discord.TextStyle.short,
-        max_length=10,
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        if self.code_input.value == self.verification_code:
-            # Add verified role (you may need to adjust the role name/ID)
-            guild = interaction.guild
-            verified_role = discord.utils.get(guild.roles, name="Verified")
-
-            if not verified_role:
-                # Create verified role if it doesn't exist
-                try:
-                    verified_role = await guild.create_role(name="Verified", color=0x00ff00)
-                    print(f"✅ Created Verified role")
-                except:
-                    pass
-
-            if verified_role:
-                try:
-                    await interaction.user.add_roles(verified_role)
-                    embed = discord.Embed(
-                        title="✅ Verification Successful!",
-                        description="You have been successfully verified and now have access to all server channels!",
-                        color=0x00ff00
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                except:
-                    embed = discord.Embed(
-                        title="✅ Verification Complete!",
-                        description="You have been verified! Welcome to the server!",
-                        color=0x00ff00
-                    )
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-            else:
-                embed = discord.Embed(
-                    title="✅ Verification Complete!",
-                    description="You have been verified! Welcome to the server!",
-                    color=0x00ff00
-                )
-                await interaction.response.send_message(embed=embed, ephemeral=True)
-        else:
-            embed = discord.Embed(
-                title="❌ Verification Failed",
-                description="Incorrect verification code. Please try again.",
-                color=0xff0000
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-
-class VerifyView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label='Verify', style=discord.ButtonStyle.success, emoji='✅', custom_id='server_verify')
-    async def verify_user(self, interaction: discord.Interaction, button: discord.ui.Button):
-        import random
-        import string
-
-        # Generate random verification code
-        verification_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-
-        # Show the code first
-        embed = discord.Embed(
-            title="🔐 Verification Code",
-            description=f"**Your verification code is:**\n\n`{verification_code}`\n\nCopy this code and enter it in the next step.",
-            color=0x3498db
-        )
-        embed.set_footer(text="Copy the code above and click OK to continue")
-
-        # Create a simple continue view
-        continue_view = ContinueVerifyView(verification_code)
-        await interaction.response.send_message(embed=embed, view=continue_view, ephemeral=True)
-
-class ContinueVerifyView(discord.ui.View):
-    def __init__(self, verification_code):
-        super().__init__(timeout=300)
-        self.verification_code = verification_code
-
-    @discord.ui.button(label='Continue Verification', style=discord.ButtonStyle.primary, emoji='➡️')
-    async def continue_verify(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = VerifyModal(self.verification_code)
-        await interaction.response.send_modal(modal)
 
 # Utility functions
 def check_channel_permissions(channel):
@@ -2074,7 +1964,6 @@ async def on_ready():
     # Add persistent views
     bot.add_view(SupportView())
     bot.add_view(GangRecruitmentView())
-    bot.add_view(VerifyView())
     bot.add_view(OrderTicketControlView(None))
 
     # Sync slash commands
@@ -2491,34 +2380,7 @@ async def news(interaction: discord.Interaction, title: str = None, content: str
         except (discord.NotFound, discord.InteractionResponded):
             pass
 
-@bot.tree.command(name="spawn_verify", description="Spawn verification panel")
-async def spawn_verify(interaction: discord.Interaction):
-    """Spawn server verification panel"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
 
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ Verification panel spawned successfully!", ephemeral=True)
-
-        # Then send the public panel directly to the channel
-        embed = create_verify_embed()
-        view = VerifyView()
-        await interaction.channel.send(embed=embed, view=view)
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning verify panel: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning verify panel: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
 
 @bot.tree.command(name="reminder", description="Set a reminder")
 async def reminder(interaction: discord.Interaction, time: str, message: str):
