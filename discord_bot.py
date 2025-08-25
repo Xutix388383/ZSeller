@@ -295,7 +295,463 @@ WATCHES = [
     "Red AP Watch", "CubanG AP", "CubanP AP", "CubanB AP", "Iced AP"
 ]
 
-# Main shop view with working buttons
+# New shop view with purchase and calculator buttons
+class NewShopView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label='Calculate your order then purchase', style=discord.ButtonStyle.primary, emoji='🧮', custom_id='new_shop_calculator')
+    async def calculator(self, interaction: discord.Interaction, button: discord.ui.Button):
+        calculator_view = CalculatorView()
+        embed = discord.Embed(
+            title="🛒 ZSupply Cart & Calculator",
+            description="**Add items to your cart:**\n\n🛒 **Cart Total: $0.00**",
+            color=0x00ff00
+        )
+        embed.add_field(
+            name="🛒 Your Cart:",
+            value="No items in cart yet",
+            inline=False
+        )
+        embed.add_field(
+            name="📝 How It Works:",
+            value="1️⃣ Add items to your cart using buttons below\n2️⃣ Click 'Purchase Cart' when ready\n3️⃣ Your cart items will be sent in your ticket",
+            inline=False
+        )
+        embed.set_footer(text="Add items to cart, then click Purchase Cart to order!")
+        await interaction.response.send_message(embed=embed, view=calculator_view, ephemeral=True)
+
+# Cart purchase modal for calculator orders
+class CartPurchaseModal(discord.ui.Modal, title='Purchase Cart Items'):
+    def __init__(self, cart_items, cart_total, cart_summary):
+        super().__init__()
+        self.cart_items = cart_items
+        self.cart_total = cart_total
+        self.cart_summary = cart_summary
+
+    special_notes = discord.ui.TextInput(
+        label='Any special requests or notes?',
+        placeholder='Custom requirements, preferred delivery time, etc...',
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        global TICKET_COUNTER
+        ticket_number = TICKET_COUNTER
+        TICKET_COUNTER += 1
+
+        # Create private ticket in specified channel
+        PRIVATE_TICKET_CHANNEL_ID = 1408167680317325434
+        ticket_channel = interaction.guild.get_channel(PRIVATE_TICKET_CHANNEL_ID)
+
+        if not ticket_channel:
+            await interaction.response.send_message("❌ Private ticket channel not found! Please contact an administrator.", ephemeral=True)
+            return
+
+        # Store ticket data
+        ticket_id = f"cart_{ticket_number:04d}_{interaction.user.id}"
+        ACTIVE_ORDER_TICKETS[ticket_id] = {
+            'user_id': interaction.user.id,
+            'ticket_number': ticket_number,
+            'cart_items': self.cart_items,
+            'cart_total': self.cart_total,
+            'cart_summary': self.cart_summary,
+            'special_notes': self.special_notes.value,
+            'created_at': datetime.now().isoformat(),
+            'channel_id': ticket_channel.id
+        }
+        save_data()
+
+        # Create order embed for private channel
+        embed = discord.Embed(
+            title=f"🛒 Cart Order #{ticket_number:04d}",
+            description=f"**Customer:** {interaction.user.mention} ({interaction.user.display_name})\n**User ID:** {interaction.user.id}",
+            color=0x00ff00,
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(
+            name="🛒 Cart Items & Total",
+            value=f"```{self.cart_summary}```",
+            inline=False
+        )
+
+        if self.special_notes.value:
+            embed.add_field(
+                name="📝 Special Notes",
+                value=f"```{self.special_notes.value}```",
+                inline=False
+            )
+
+        embed.add_field(
+            name="💳 Payment Instructions",
+            value=f"**Total Amount: ${self.cart_total:.2f}**\n\n**Send payment to:**\n• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n\n**After payment, let us know in this ticket!**",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📋 Next Steps",
+            value="1️⃣ Send payment using methods above\n2️⃣ Confirm payment in this channel\n3️⃣ Staff will process your order\n4️⃣ Receive your items instantly",
+            inline=False
+        )
+
+        embed.set_footer(text="ZSupply Cart Order System • Staff will assist you")
+
+        # Create control view for staff
+        view = PrivateTicketControlView(ticket_id)
+        view.add_item(CalculatorButton())
+
+        message = await ticket_channel.send(f"🔥 **NEW CART ORDER - Customer:** {interaction.user.mention}", embed=embed, view=view)
+
+        # Store message ID
+        ACTIVE_ORDER_TICKETS[ticket_id]['message_id'] = message.id
+        save_data()
+
+        await interaction.response.send_message(f"✅ Cart order created! Staff will assist you in the private channel.", ephemeral=True)
+
+# New purchase modal for private tickets
+class NewPurchaseModal(discord.ui.Modal, title='Create Purchase Order'):
+    def __init__(self):
+        super().__init__()
+
+    item_selection = discord.ui.TextInput(
+        label='What would you like to purchase?',
+        placeholder='List the items/services you want to buy...',
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+
+    special_notes = discord.ui.TextInput(
+        label='Any special requests or notes?',
+        placeholder='Custom requirements, preferred delivery time, etc...',
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        global TICKET_COUNTER
+        ticket_number = TICKET_COUNTER
+        TICKET_COUNTER += 1
+
+        # Create private ticket in specified channel
+        PRIVATE_TICKET_CHANNEL_ID = 1408167680317325434
+        ticket_channel = interaction.guild.get_channel(PRIVATE_TICKET_CHANNEL_ID)
+
+        if not ticket_channel:
+            await interaction.response.send_message("❌ Private ticket channel not found! Please contact an administrator.", ephemeral=True)
+            return
+
+        # Store ticket data
+        ticket_id = f"purchase_{ticket_number:04d}_{interaction.user.id}"
+        ACTIVE_ORDER_TICKETS[ticket_id] = {
+            'user_id': interaction.user.id,
+            'ticket_number': ticket_number,
+            'items': self.item_selection.value,
+            'special_notes': self.special_notes.value,
+            'created_at': datetime.now().isoformat(),
+            'channel_id': ticket_channel.id
+        }
+        save_data()
+
+        # Create order embed for private channel
+        embed = discord.Embed(
+            title=f"🎫 Purchase Order #{ticket_number:04d}",
+            description=f"**Customer:** {interaction.user.mention} ({interaction.user.display_name})\n**User ID:** {interaction.user.id}",
+            color=0x00ff00,
+            timestamp=datetime.now()
+        )
+
+        embed.add_field(
+            name="🛍️ Requested Items",
+            value=f"```{self.item_selection.value}```",
+            inline=False
+        )
+
+        if self.special_notes.value:
+            embed.add_field(
+                name="📝 Special Notes",
+                value=f"```{self.special_notes.value}```",
+                inline=False
+            )
+
+        embed.add_field(
+            name="💳 Payment Instructions",
+            value="**Please send payment to:**\n• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n\n**After payment, type what you want in this ticket!**",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📋 Next Steps",
+            value="1️⃣ Calculate total using calculator button\n2️⃣ Send payment using methods above\n3️⃣ Type exactly what you want in this channel\n4️⃣ Staff will process your order",
+            inline=False
+        )
+
+        embed.set_footer(text="ZSupply Private Order System • Staff will assist you")
+
+        # Create control view for staff
+        view = PrivateTicketControlView(ticket_id)
+        view.add_item(CalculatorButton())
+
+        message = await ticket_channel.send(f"🔥 **NEW ORDER - Customer:** {interaction.user.mention}", embed=embed, view=view)
+
+        # Store message ID
+        ACTIVE_ORDER_TICKETS[ticket_id]['message_id'] = message.id
+        save_data()
+
+        await interaction.response.send_message(f"✅ Private order ticket created! Staff will assist you in the private channel.", ephemeral=True)
+
+# Calculator system
+class CalculatorView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+        self.total = 0.0
+        self.items = []
+
+    async def update_embed(self, interaction):
+        embed = discord.Embed(
+            title="🛒 ZSupply Cart & Calculator",
+            description=f"**Add items to your cart:**\n\n🛒 **Cart Total: ${self.total:.2f}**",
+            color=0x00ff00
+        )
+
+        if self.items:
+            items_list = "\n".join([f"• {item['name']} - ${item['price']:.2f}" for item in self.items])
+        else:
+            items_list = "No items in cart yet"
+
+        embed.add_field(
+            name="🛒 Your Cart:",
+            value=items_list,
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📝 How It Works:",
+            value="1️⃣ Add items to your cart using buttons below\n2️⃣ Click 'Purchase Cart' when ready\n3️⃣ Your cart items will be sent in your ticket",
+            inline=False
+        )
+        
+        embed.set_footer(text="Add items to cart, then click Purchase Cart to order!")
+
+        try:
+            await interaction.response.edit_message(embed=embed, view=self)
+        except:
+            await interaction.edit_original_response(embed=embed, view=self)
+
+    @discord.ui.button(label='Watch $1', style=discord.ButtonStyle.secondary)
+    async def add_watch(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Watch", "price": 1.0})
+        self.total += 1.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='TB3 990k Bank $1', style=discord.ButtonStyle.secondary)
+    async def add_tb3_990k_bank(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "TB3 990k Bank", "price": 1.0})
+        self.total += 1.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='TB3 990k Clean $1', style=discord.ButtonStyle.secondary)
+    async def add_tb3_990k_clean(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "TB3 990k Clean", "price": 1.0})
+        self.total += 1.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='TB3 1.6M Bank (GP) $2', style=discord.ButtonStyle.secondary)
+    async def add_tb3_16m_bank_gp(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "TB3 1.6M Bank (Gamepass Only)", "price": 2.0})
+        self.total += 2.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='TB3 1.6M Clean (GP) $2', style=discord.ButtonStyle.secondary)
+    async def add_tb3_16m_clean_gp(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "TB3 1.6M Clean (Gamepass Only)", "price": 2.0})
+        self.total += 2.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='PS2 Million $1', style=discord.ButtonStyle.secondary)
+    async def add_ps2_money(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "PS2 Money (1M)", "price": 1.0})
+        self.total += 1.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Safe Package $5', style=discord.ButtonStyle.secondary)
+    async def add_safe_package(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Safe Package", "price": 5.0})
+        self.total += 5.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Bag Package $3', style=discord.ButtonStyle.secondary)
+    async def add_bag_package(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Bag Package", "price": 3.0})
+        self.total += 3.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Trunk Package $2', style=discord.ButtonStyle.secondary)
+    async def add_trunk_package(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Trunk Package", "price": 2.0})
+        self.total += 2.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Max Account $3', style=discord.ButtonStyle.secondary)
+    async def add_max_account(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Max Account", "price": 3.0})
+        self.total += 3.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Stats + Money $6', style=discord.ButtonStyle.secondary)
+    async def add_stats_money(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Stats + Money", "price": 6.0})
+        self.total += 6.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Fully Stacked $8', style=discord.ButtonStyle.secondary)
+    async def add_fully_stacked(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Fully Stacked Account", "price": 8.0})
+        self.total += 8.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='Rollback Account $10', style=discord.ButtonStyle.secondary)
+    async def add_rollback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items.append({"name": "Rollback Account", "price": 10.0})
+        self.total += 10.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='🗑️ Clear All', style=discord.ButtonStyle.danger, row=4)
+    async def clear_all(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.items = []
+        self.total = 0.0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='↩️ Remove Last', style=discord.ButtonStyle.danger, row=4)
+    async def remove_last(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.items:
+            removed = self.items.pop()
+            self.total -= removed['price']
+            if self.total < 0:
+                self.total = 0
+        await self.update_embed(interaction)
+
+    @discord.ui.button(label='🛒 Purchase Cart', style=discord.ButtonStyle.success, row=4)
+    async def purchase_cart(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.items:
+            await interaction.response.send_message("❌ Your cart is empty! Add items first.", ephemeral=True)
+            return
+        
+        # Create cart summary for the modal
+        cart_summary = "\n".join([f"• {item['name']} - ${item['price']:.2f}" for item in self.items])
+        cart_summary += f"\n\nTotal: ${self.total:.2f}"
+        
+        # Pass cart data to purchase modal
+        modal = CartPurchaseModal(self.items, self.total, cart_summary)
+        await interaction.response.send_modal(modal)
+
+# Calculator button for tickets
+class CalculatorButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label='🧮 Calculator', style=discord.ButtonStyle.primary, emoji='🧮')
+
+    async def callback(self, interaction: discord.Interaction):
+        calculator_view = CalculatorView()
+        embed = discord.Embed(
+            title="🛒 ZSupply Cart & Calculator",
+            description="**Add items to your cart:**\n\n🛒 **Cart Total: $0.00**",
+            color=0x00ff00
+        )
+        embed.add_field(
+            name="🛒 Your Cart:",
+            value="No items in cart yet",
+            inline=False
+        )
+        embed.add_field(
+            name="📝 How It Works:",
+            value="1️⃣ Add items to your cart using buttons below\n2️⃣ Click 'Purchase Cart' when ready\n3️⃣ Your cart items will be sent in your ticket",
+            inline=False
+        )
+        embed.set_footer(text="Add items to cart, then click Purchase Cart to order!")
+        await interaction.response.send_message(embed=embed, view=calculator_view, ephemeral=True)
+
+# Private ticket control view
+class PrivateTicketControlView(discord.ui.View):
+    def __init__(self, ticket_id):
+        super().__init__(timeout=None)
+        self.ticket_id = ticket_id
+
+    @discord.ui.button(label='Complete Order', style=discord.ButtonStyle.success, emoji='✅', custom_id='private_complete_order')
+    async def complete_order(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._close_ticket(interaction, "completed")
+
+    @discord.ui.button(label='Close Ticket', style=discord.ButtonStyle.danger, emoji='🔒', custom_id='private_close_ticket')
+    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._close_ticket(interaction, "closed")
+
+    async def _close_ticket(self, interaction, action_type):
+        """Handle ticket closing"""
+        # Get ticket data
+        ticket_data = ACTIVE_ORDER_TICKETS.get(self.ticket_id)
+        if not ticket_data:
+            await interaction.response.send_message("❌ Ticket data not found.", ephemeral=True)
+            return
+
+        # Create closure summary embed
+        closure_embed = discord.Embed(
+            title=f"🔒 Purchase Order #{ticket_data['ticket_number']:04d} - {action_type.title()}",
+            description=f"**Customer:** <@{ticket_data['user_id']}>\n**Status:** {action_type.title()}",
+            color=0x00ff00 if action_type == "completed" else 0xff0000,
+            timestamp=datetime.now()
+        )
+
+        # Handle different ticket types
+        if 'cart_summary' in ticket_data:
+            closure_embed.add_field(
+                name="🛒 Cart Order",
+                value=f"```{ticket_data.get('cart_summary', 'No cart data')}```",
+                inline=False
+            )
+        else:
+            closure_embed.add_field(
+                name="🛍️ Ordered Items",
+                value=f"```{ticket_data.get('items', 'No items listed')}```",
+                inline=False
+            )
+
+        if ticket_data.get('special_notes'):
+            closure_embed.add_field(
+                name="📝 Special Notes",
+                value=f"```{ticket_data['special_notes']}```",
+                inline=False
+            )
+
+        closure_embed.add_field(
+            name="📊 Ticket Information",
+            value=f"**Created:** <t:{int(datetime.fromisoformat(ticket_data['created_at']).timestamp())}:R>\n**Closed:** <t:{int(datetime.now().timestamp())}:R>\n**Handled By:** {interaction.user.mention}",
+            inline=False
+        )
+
+        closure_embed.set_footer(text=f"ZSupply Order System • Ticket {action_type}")
+
+        # Remove from active tickets
+        if self.ticket_id in ACTIVE_ORDER_TICKETS:
+            del ACTIVE_ORDER_TICKETS[self.ticket_id]
+            save_data()
+
+        # Send confirmation in same channel
+        status_embed = discord.Embed(
+            title=f"✅ Order {action_type.title()}",
+            description=f"This order has been {action_type}. Thank you for using ZSupply!",
+            color=0x00ff00 if action_type == "completed" else 0xff0000
+        )
+
+        # Update the original message to remove buttons
+        try:
+            await interaction.response.edit_message(embed=status_embed, view=None)
+        except:
+            await interaction.response.send_message(embed=status_embed)
+
+# Keep old ShopMainView for backward compatibility
 class ShopMainView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -702,7 +1158,7 @@ def create_tb3_showcase_embed():
     # Money services
     embed.add_field(
         name="💰 ═══ MONEY SERVICES ═══ 💰",
-        value="```yaml\n💵 Max Money 990k - $1.00\n🏦 Max Bank 990k - $1.00\n💎 Max Money 1.6M - $2.00\n💳 Max Bank 1.6M - $2.00\n\n🚀 INSTANT DELIVERY\n✨ 24/7 SUPPORT```",
+        value="```yaml\n🏦 Bank 990k - $1.00\n💵 Clean 990k - $1.00\n💎 Bank 1.6M (GP) - $2.00\n✨ Clean 1.6M (GP) - $2.00\n\n🚀 INSTANT DELIVERY\n✨ 24/7 SUPPORT```",
         inline=True
     )
 
@@ -1035,7 +1491,7 @@ async def on_ready():
     bot.add_view(SupportView())
     bot.add_view(GangRecruitmentView())
     bot.add_view(ShopMainView())
-    bot.add_view(OrderTicketControlView(None))
+    bot.add_view(NewShopView())
 
     # Sync slash commands
     try:
@@ -1126,15 +1582,15 @@ async def auto_setup_all_embeds():
     except Exception as e:
         print(f"Error in auto-setup: {e}")
 
-# Check if user is authorized to use spawn commands
+# Utility functions
 def is_authorized_user(user_id):
     """Check if user is authorized to run spawn commands"""
     return user_id == 1385239185006268457
 
-# Comprehensive shop spawn command
-@bot.tree.command(name="spawn_shops", description="Spawn all shop showcases")
+# New ZSupply shop spawn command with ticket system and calculator
+@bot.tree.command(name="spawn_shops", description="Spawn ZSupply shop with ticket system")
 async def spawn_shops(interaction: discord.Interaction):
-    """Spawn all shop showcases with working ticket system"""
+    """Spawn new ZSupply shop with working ticket system and calculator"""
     try:
         # Check authorization
         if not is_authorized_user(interaction.user.id):
@@ -1142,67 +1598,42 @@ async def spawn_shops(interaction: discord.Interaction):
             return
 
         # First respond privately to confirm command
-        await interaction.response.send_message("✅ All shop showcases spawned successfully!", ephemeral=True)
+        await interaction.response.send_message("✅ ZSupply shop spawned successfully!", ephemeral=True)
 
-        # Create comprehensive shop showcase with working buttons
+        # Create new ZSupply shop embed
         embed = discord.Embed(
-            title="🛒 **ZSUPPLY PREMIUM SHOP** 🛒",
-            description="═══════════════════════════════════════\n🔥 **ALL GAMES • INSTANT DELIVERY • 24/7 SUPPORT** 🔥\n═══════════════════════════════════════",
-            color=0x00ff00,
+            title="⚡ ZSELLS ⚡",
+            description="**Trusted By 50+ • Best Prices • 24/7 SUPPORT**",
+            color=0x000000,
             timestamp=datetime.now()
         )
+        
+        # Add header image
+        embed.set_image(url="https://cdn.discordapp.com/attachments/1407347218951700534/1409618120515260570/Electric_Fury_of_ZSELLS.png?ex=68ae08ad&is=68acb72d&hm=c2de3ae059568166e9faa9f459b01819e279c00f654fdc3a6bfbd7e531cac28f&")
 
-        # The Bronx 3 Section
         embed.add_field(
-            name="🗽 **THE BRONX 3** 🗽",
-            value=f"```css\n🔫 WEAPONS: {len(WEAPONS)} Available\n⌚ WATCHES: {len(WATCHES)} Available\n💰 MONEY: Max 990k-1.6M\n📦 PACKAGES: Safe/Bag/Trunk\n\n💵 PRICING:\n• Weapons: $1-3 each\n• Watches: $1 each\n• Money: $1-2 per service```",
-            inline=False
-        )
-
-        # Philly Streets 2 Section
-        embed.add_field(
-            name="🦅 **PHILLY STREETS 2** 🦅",
-            value="```css\n💰 MONEY: $1 per Million\n🎮 ACCOUNTS: Premium Ready\n📊 MODDED STATS: Available\n♾️ INFINITE MONEY: Special\n\n💵 PRICING:\n• Money: $1-10 (1M-10M)\n• Max Account: $3\n• Modded + Money: $6\n• Fully Stacked: $8\n• Perm Infinite: $10```",
-            inline=False
-        )
-
-        # South Bronx Section
-        embed.add_field(
-            name="🔥 **SOUTH BRONX THE TRENCHES** 🔥",
-            value="```css\n💎 LEGENDARY ACCOUNT\n💰 3.5M Total Money\n⏰ 200+ Days Old\n🎰 Lucky Weapons Included\n\n💵 PRICING:\n• Complete Account: $3.00\n• 80% OFF Regular Price\n• Instant Access```",
-            inline=False
-        )
-
-        # Roblox Alts Section
-        embed.add_field(
-            name="🎮 **ROBLOX ALTS SHOP** 🎮",
-            value="```css\n⏰ 200+ DAYS GUARANTEED\n🎮 FULLY STACKED ACCOUNTS\n💎 HAND-PICKED PREMIUM\n🚀 INSTANT ACCESS\n\n💵 PRICING:\n• Any Game Account: $3.00\n• Complete Setup Included\n• Backup Email Access```",
-            inline=False
-        )
-
-        # Payment & Ordering Info
-        embed.add_field(
-            name="💳 **PAYMENT METHODS**",
-            value="```yaml\n💰 CashApp: https://cash.app/$EthanCreel1\n📱 Apple Pay: 7656156371\n💳 PayPal: Coming Soon\n\n✅ ALL PAYMENTS SECURE\n✅ INSTANT PROCESSING```",
+            name="🗽 THE BRONX 3",
+            value="**Dupe of your choice**\n• Watches: **$1 each**\n• Money 990k (Bank/Clean): **$1 each**\n• Money 1.6M (Gamepass Only): **$2 each**\n• Packages:\n  - Safe Package: **$5**\n  - Bag Package: **$3**\n  - Trunk Package: **$2**",
             inline=True
         )
 
         embed.add_field(
-            name="🚀 **WHY CHOOSE US?**",
-            value="```diff\n+ INSTANT DELIVERY\n+ 24/7 SUPPORT\n+ 1000+ SATISFIED CUSTOMERS\n+ MONEY-BACK GUARANTEE\n+ SECURE TRANSACTIONS\n+ PREMIUM QUALITY```",
+            name="🦅 PHILLY STREETS 2",
+            value="• Money: **$1 per Million**\n• Max Account: **$3**\n• Stats + Money: **$6**\n• Fully Stacked Account: **$8**\n• ROLLBACK! ACCOUNT: **$10**",
             inline=True
         )
 
         embed.add_field(
-            name="🛒 **HOW TO ORDER**",
-            value="```yaml\n1️⃣ Click 'Create Order' below\n2️⃣ Tell us what you want\n3️⃣ Complete payment\n4️⃣ Receive instantly!\n\n📞 Need help? Create support ticket!```",
+            name="⚡ HOW TO ORDER",
+            value="**Click the button below to:**\n🧮 Calculate your order then purchase\n\n**Fast Delivery • Secure Payment**",
             inline=False
         )
 
-        embed.set_footer(text="🔥 ZSupply • Premium Gaming Services • Trusted by 1000+ Customers 🔥")
+        embed.set_footer(text="⚡ BUY HERE ⚡")
+        embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1407347218951700534/1409618121051865168/Lightning-Powered__BUY_HERE__Design.png?ex=68ae08ad&is=68acb72d&hm=30c3b2adf6aa6a0cc489a309df85b9f5b1e44067f9b3170d0437b7297a05930f&")
 
-        # Create view with working buttons
-        view = ShopMainView()
+        # Create view with new buttons
+        view = NewShopView()
         await interaction.channel.send(embed=embed, view=view)
 
     except Exception as e:
