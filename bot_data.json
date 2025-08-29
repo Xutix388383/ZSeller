@@ -1,6 +1,31 @@
 {
-  "ticket_counter": 1,
+  "ticket_counter": 2,
   "active_tickets": {},
+  "active_order_tickets": {
+    "cart_0001_1385239185006268457": {
+      "user_id": 1385239185006268457,
+      "ticket_number": 1,
+      "cart_items": [
+        {
+          "name": "TB3 1.6M Bank (Gamepass Only)",
+          "price": 2.0
+        },
+        {
+          "name": "TB3 1.6M Clean (Gamepass Only)",
+          "price": 2.0
+        },
+        {
+          "name": "Bag Package",
+          "price": 3.0
+        }
+      ],
+      "cart_total": 7.0,
+      "cart_summary": "\u2022 TB3 1.6M Bank (Gamepass Only) - $2.00\n\u2022 TB3 1.6M Clean (Gamepass Only) - $2.00\n\u2022 Bag Package - $3.00\n\nTotal: $7.00",
+      "special_notes": "Fast",
+      "created_at": "2025-08-25T19:26:53.866086",
+      "channel_id": 1408167680317325434
+    }
+  },
   "news_data": {
     "title": "\ud83d\udcf0 Latest News",
     "content": "No news updates yet.",

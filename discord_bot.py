@@ -24,8 +24,8 @@ def get_channels_by_name(guild):
 
     # Define comprehensive channel name patterns
     channel_patterns = {
-        'support': ['support', 'help', 'ticket', 'assistance', 'staff', 'admin', 'mod', 'report', 'contact'],
-        'stk': ['stk', 'gang', 'recruitment', 'join', 'member', 'recruit', 'crew', 'team', 'clan'],
+        'support': ['support', 'help', 'ticket', 'tickets', '𝐭𝐢𝐜𝐤𝐞𝐭', '𝐓𝐢𝐜𝐤𝐞𝐭', 'assistance', 'staff', 'admin', 'mod', 'report', 'contact'],
+        'general': ['general', 'main', 'lobby', 'entrance', 'start', 'begin', 'intro', 'recruitment', 'join', 'member', 'recruit', 'crew', 'team', 'clan'],
         'tos': ['tos', 'terms', 'legal', 'policy', 'agreement', 'conditions', 'service'],
         'rules': ['rules', 'guidelines', 'info', 'information', 'guide', 'regulation', 'law'],
         'news': ['news', 'announcements', 'updates', 'notice', 'alert', 'broadcast', 'announce'],
@@ -46,9 +46,13 @@ def get_channels_by_name(guild):
             continue  # Skip channels bot can't see
 
         channel_name_lower = channel.name.lower()
-        # Enhanced cleaning - remove emojis, special chars, but keep essential separators
-        clean_name = ''.join(c for c in channel_name_lower if c.isalnum() or c in ['-', '_', ' '])
-
+        
+        # Enhanced cleaning - remove emojis, special chars, but keep essential separators and Unicode letters
+        clean_name = ''.join(c for c in channel_name_lower if c.isalnum() or c in ['-', '_', ' '] or ord(c) > 127)
+        
+        # Also check original name for Unicode styled text like 𝐓𝐢𝐜𝐤𝐞𝐭𝐬
+        original_name = channel.name
+        
         # Split by common separators for better word matching
         name_words = clean_name.replace('-', ' ').replace('_', ' ').split()
 
@@ -58,9 +62,10 @@ def get_channels_by_name(guild):
                 continue
 
             for pattern in patterns:
-                # Multiple matching strategies
+                # Multiple matching strategies including Unicode styled text
                 if (pattern in clean_name or
                     pattern in channel_name_lower or
+                    pattern in original_name.lower() or
                     any(pattern in word for word in name_words) or
                     any(word.startswith(pattern) for word in name_words) or
                     any(word.endswith(pattern) for word in name_words)):
@@ -346,8 +351,11 @@ class CartPurchaseModal(discord.ui.Modal, title='Purchase Cart Items'):
         PRIVATE_TICKET_CHANNEL_ID = 1408167680317325434
         ticket_channel = interaction.guild.get_channel(PRIVATE_TICKET_CHANNEL_ID)
 
-        if not ticket_channel:
-            await interaction.response.send_message("❌ Private ticket channel not found! Please contact an administrator.", ephemeral=True)
+        # Check if it's a category channel and get the first text channel from it
+        if ticket_channel and hasattr(ticket_channel, 'text_channels') and ticket_channel.text_channels:
+            ticket_channel = ticket_channel.text_channels[0]
+        elif not ticket_channel or not hasattr(ticket_channel, 'send'):
+            await interaction.response.send_message("❌ Private ticket channel not found or invalid! Please contact an administrator.", ephemeral=True)
             return
 
         # Store ticket data
@@ -441,8 +449,11 @@ class NewPurchaseModal(discord.ui.Modal, title='Create Purchase Order'):
         PRIVATE_TICKET_CHANNEL_ID = 1408167680317325434
         ticket_channel = interaction.guild.get_channel(PRIVATE_TICKET_CHANNEL_ID)
 
-        if not ticket_channel:
-            await interaction.response.send_message("❌ Private ticket channel not found! Please contact an administrator.", ephemeral=True)
+        # Check if it's a category channel and get the first text channel from it
+        if ticket_channel and hasattr(ticket_channel, 'text_channels') and ticket_channel.text_channels:
+            ticket_channel = ticket_channel.text_channels[0]
+        elif not ticket_channel or not hasattr(ticket_channel, 'send'):
+            await interaction.response.send_message("❌ Private ticket channel not found or invalid! Please contact an administrator.", ephemeral=True)
             return
 
         # Store ticket data
@@ -528,13 +539,13 @@ class CalculatorView(discord.ui.View):
             value=items_list,
             inline=False
         )
-        
+
         embed.add_field(
             name="📝 How It Works:",
             value="1️⃣ Add items to your cart using buttons below\n2️⃣ Click 'Purchase Cart' when ready\n3️⃣ Your cart items will be sent in your ticket",
             inline=False
         )
-        
+
         embed.set_footer(text="Add items to cart, then click Purchase Cart to order!")
 
         try:
@@ -640,11 +651,11 @@ class CalculatorView(discord.ui.View):
         if not self.items:
             await interaction.response.send_message("❌ Your cart is empty! Add items first.", ephemeral=True)
             return
-        
+
         # Create cart summary for the modal
         cart_summary = "\n".join([f"• {item['name']} - ${item['price']:.2f}" for item in self.items])
         cart_summary += f"\n\nTotal: ${self.total:.2f}"
-        
+
         # Pass cart data to purchase modal
         modal = CartPurchaseModal(self.items, self.total, cart_summary)
         await interaction.response.send_modal(modal)
@@ -764,32 +775,7 @@ class ShopMainView(discord.ui.View):
     async def support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(TicketModal())
 
-    @discord.ui.button(label='⚔️ Join STK Gang', style=discord.ButtonStyle.secondary, emoji='⚔️', custom_id='shop_join_gang')
-    async def join_gang(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            embed = discord.Embed(
-                title="🎉 Welcome to STK Gang!",
-                description="**You're about to join one of the most elite gangs!**\n\nMake sure you're ready to represent STK across all games.",
-                color=0x00ff00
-            )
-            embed.add_field(
-                name="👕 Remember Your Outfit",
-                value="**SHIRT:** Green Varsity\n**PANTS:** Green Ripped Jeans",
-                inline=False
-            )
-            embed.add_field(
-                name="🔗 Join Our Gang Discord",
-                value="**Click here to join:** https://discord.gg/7rG6jVTVmX",
-                inline=False
-            )
-            embed.set_footer(text="STK Gang • Elite Members Only • Wear your colors with pride!")
-
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            try:
-                await interaction.response.send_message("✅ STK Gang link: https://discord.gg/7rG6jVTVmX", ephemeral=True)
-            except:
-                pass
+    
 
 # Purchase ticket system
 class PurchaseTicketModal(discord.ui.Modal, title='Create Purchase Order'):
@@ -1454,17 +1440,17 @@ def create_welcome_embed():
     )
     embed.add_field(
         name="🚀 Getting Started",
-        value="• Read our rules and guidelines\n• Check out our shop for premium items\n• Join our STK Gang for exclusive perks\n• Create a support ticket if you need help",
+        value="• Read our rules and guidelines\n• Check out our shop for premium items\n• Browse our premium services\n• Create a support ticket if you need help",
         inline=False
     )
     embed.add_field(
         name="🌟 Community Benefits",
-        value="• Premium services\n• 24/7 support\n• Exclusive deals\n• Elite gang access\n• Trusted community",
+        value="• Premium services\n• 24/7 support\n• Exclusive deals\n• Premium products\n• Trusted community",
         inline=False
     )
     embed.add_field(
         name="🔗 Quick Links",
-        value="• **Shop** - Premium products\n• **Support** - Get help instantly\n• **STK Gang** - Join the elite\n• **Rules** - Community guidelines",
+        value="• **Shop** - Premium products\n• **Support** - Get help instantly\n• **Services** - Premium offerings\n• **Rules** - Community guidelines",
         inline=False
     )
     embed.set_footer(text="ZSells Community • Your premium gaming destination!")
@@ -1505,6 +1491,15 @@ async def on_ready():
     print('🔍 COMPREHENSIVE AUTO-DETECTION SYSTEM ACTIVATED')
     print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
+    # Auto-detect channels for each guild the bot is in
+    for guild in bot.guilds:
+        print(f"\n🏰 Analyzing guild: {guild.name} (ID: {guild.id})")
+        detected_channels = get_channels_by_name(guild)
+        CHANNELS.update(detected_channels)
+        
+        # Perform full guild analysis
+        GUILD_ANALYSIS[guild.id] = analyze_guild_structure(guild)
+
     # Auto-setup all embeds in their respective channels
     await auto_setup_all_embeds()
 
@@ -1527,19 +1522,17 @@ async def auto_setup_all_embeds():
                 except Exception as e:
                     print(f"❌ Error setting up support panel: {e}")
 
-        # Setup gang recruitment
-        if 'stk' in CHANNELS:
-            stk_channel = bot.get_channel(CHANNELS['stk'])
-            if stk_channel and check_channel_permissions(stk_channel):
+        # Setup general channel (formerly gang recruitment)
+        if 'general' in CHANNELS:
+            general_channel = bot.get_channel(CHANNELS['general'])
+            if general_channel and check_channel_permissions(general_channel):
                 try:
-                    embed = create_gang_embed()
-                    view = GangRecruitmentView()
-                    await stk_channel.send(embed=embed, view=view)
-                    print("✅ Gang recruitment panel auto-setup complete!")
+                    # Only setup welcome message in general channel
+                    print(f"✅ General channel detected: #{general_channel.name}")
                 except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{stk_channel.name}")
+                    print(f"❌ No permission to send messages in #{general_channel.name}")
                 except Exception as e:
-                    print(f"❌ Error setting up gang recruitment: {e}")
+                    print(f"❌ Error with general channel: {e}")
 
         # Setup ToS
         if 'tos' in CHANNELS:
@@ -1607,7 +1600,7 @@ async def spawn_shops(interaction: discord.Interaction):
             color=0x000000,
             timestamp=datetime.now()
         )
-        
+
         # Add header image
         embed.set_image(url="https://cdn.discordapp.com/attachments/1407347218951700534/1409618120515260570/Electric_Fury_of_ZSELLS.png?ex=68ae08ad&is=68acb72d&hm=c2de3ae059568166e9faa9f459b01819e279c00f654fdc3a6bfbd7e531cac28f&")
 
