@@ -1673,6 +1673,321 @@ async def ria_applications(interaction: discord.Interaction, status: str = None)
         except:
             pass
 
+class ApplicationConfigView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="Edit Application Panels", style=discord.ButtonStyle.primary, emoji="✏️")
+    async def edit_panels(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        custom_apps = data.get('custom_applications', {})
+
+        if not custom_apps:
+            await interaction.response.send_message("❌ No application panels found! Use `/applicationcreate` to create one first.", ephemeral=True)
+            return
+
+        view = EditApplicationPanelSelectView(custom_apps)
+        await interaction.response.send_message("**Select Application Panel to Edit:**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="View Pending Applications", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def view_pending(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        
+        # Collect all pending applications from all panels
+        all_pending = []
+        
+        # Check custom applications
+        for app_id, app_data in data.get('custom_applications', {}).items():
+            for application_id, application in app_data.get('applications', {}).items():
+                if application['status'] == 'pending':
+                    all_pending.append({
+                        'id': application_id,
+                        'panel_name': app_data['name'],
+                        'panel_id': app_id,
+                        'applicant_id': application['user_id'],
+                        'submitted_at': application['submitted_at'],
+                        'type': 'custom'
+                    })
+
+        # Check RIA applications
+        for app_id, app_data in data.get('ria_applications', {}).items():
+            if app_data['status'] == 'pending':
+                all_pending.append({
+                    'id': app_id,
+                    'panel_name': 'RIA Application',
+                    'panel_id': 'ria',
+                    'applicant_id': app_data['user_id'],
+                    'submitted_at': app_data['submitted_at'],
+                    'type': 'ria'
+                })
+
+        if not all_pending:
+            await interaction.response.send_message("📋 No pending applications found!", ephemeral=True)
+            return
+
+        # Sort by submission date (newest first)
+        all_pending.sort(key=lambda x: x['submitted_at'], reverse=True)
+
+        embed = discord.Embed(
+            title="📋 All Pending Applications",
+            description=f"Total pending applications: **{len(all_pending)}**",
+            color=0xffff00,
+            timestamp=datetime.now()
+        )
+
+        # Show up to 10 pending applications
+        for i, app in enumerate(all_pending[:10]):
+            applicant = interaction.guild.get_member(app['applicant_id'])
+            applicant_name = applicant.display_name if applicant else "Unknown User"
+            
+            embed.add_field(
+                name=f"⏳ {app['id']}",
+                value=f"**Panel:** {app['panel_name']}\n**Applicant:** {applicant_name}\n**Submitted:** {app['submitted_at'][:10]}",
+                inline=True
+            )
+
+        if len(all_pending) > 10:
+            embed.set_footer(text=f"Showing 10 most recent of {len(all_pending)} pending applications")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class EditApplicationPanelSelectView(discord.ui.View):
+    def __init__(self, custom_apps):
+        super().__init__(timeout=300)
+        self.custom_apps = custom_apps
+
+        # Create select menu options
+        options = []
+        for app_id, app_data in custom_apps.items():
+            name = app_data.get('name', 'Unnamed Panel')
+            description = app_data.get('description', '')
+            
+            if description and len(description) > 100:
+                description = description[:97] + "..."
+
+            options.append(discord.SelectOption(
+                label=f"{app_id}: {name}"[:100],
+                value=app_id,
+                description=description[:100] if description else "No description"
+            ))
+
+        self.select_panel.options = options[:25]
+
+    @discord.ui.select(placeholder="Choose an application panel to edit...")
+    async def select_panel(self, interaction: discord.Interaction, select: discord.ui.Select):
+        app_id = select.values[0]
+        app_data = self.custom_apps[app_id]
+
+        # Show panel details and edit options
+        embed = discord.Embed(
+            title=f"📋 Editing Panel: {app_data['name']}",
+            description=app_data['description'],
+            color=0x0099ff
+        )
+
+        embed.add_field(name="Panel ID", value=app_id, inline=True)
+        embed.add_field(name="Fields Count", value=len(app_data.get('fields', [])), inline=True)
+        embed.add_field(name="Total Applications", value=len(app_data.get('applications', {})), inline=True)
+
+        if app_data.get('staff_channel_id'):
+            channel = interaction.guild.get_channel(app_data['staff_channel_id'])
+            embed.add_field(name="Staff Channel", value=channel.mention if channel else "Invalid Channel", inline=True)
+
+        if app_data.get('member_role_id'):
+            role = interaction.guild.get_role(app_data['member_role_id'])
+            embed.add_field(name="Auto-assign Role", value=role.mention if role else "Invalid Role", inline=True)
+
+        view = ApplicationPanelEditView(app_id)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class ApplicationPanelEditView(discord.ui.View):
+    def __init__(self, app_id):
+        super().__init__(timeout=300)
+        self.app_id = app_id
+
+    @discord.ui.button(label="Edit Panel Details", style=discord.ButtonStyle.primary, emoji="✏️")
+    async def edit_details(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        modal = EditApplicationPanelModal(self.app_id, app_data)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Manage Fields", style=discord.ButtonStyle.secondary, emoji="📝")
+    async def manage_fields(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = ApplicationFieldsView(self.app_id)
+        await interaction.response.send_message("**Field Manager:**", view=view, ephemeral=True)
+
+    @discord.ui.button(label="View Applications", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def view_applications(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        applications = app_data.get('applications', {})
+        
+        if not applications:
+            await interaction.response.send_message("📋 No applications found for this panel!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=f"📋 Applications for {app_data['name']}",
+            description=f"Total applications: **{len(applications)}**",
+            color=0x0099ff
+        )
+
+        # Status summary
+        status_counts = {}
+        for app in applications.values():
+            status_counts[app['status']] = status_counts.get(app['status'], 0) + 1
+
+        summary = "\n".join([f"**{status.title()}:** {count}" for status, count in status_counts.items()])
+        embed.add_field(name="📊 Status Summary", value=summary, inline=False)
+
+        # Show recent applications
+        recent_apps = sorted(applications.items(), key=lambda x: x[1]['submitted_at'], reverse=True)[:5]
+
+        for application_id, application in recent_apps:
+            applicant = interaction.guild.get_member(application['user_id'])
+            applicant_name = applicant.display_name if applicant else "Unknown User"
+
+            status_emoji = {'pending': '⏳', 'accepted': '✅', 'rejected': '❌'}
+
+            embed.add_field(
+                name=f"{status_emoji.get(application['status'], '❓')} {application_id}",
+                value=f"**Applicant:** {applicant_name}\n**Status:** {application['status'].title()}\n**Submitted:** {application['submitted_at'][:10]}",
+                inline=True
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="Delete Panel", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def delete_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        # Delete the panel
+        del data['custom_applications'][self.app_id]
+        save_data(data)
+
+        await interaction.response.send_message(f"✅ Successfully deleted application panel '{app_data['name']}' ({self.app_id})", ephemeral=True)
+
+class EditApplicationPanelModal(discord.ui.Modal, title="Edit Application Panel"):
+    def __init__(self, app_id, app_data):
+        super().__init__()
+        self.app_id = app_id
+
+        # Pre-fill with existing data
+        self.app_name.default = app_data.get('name', '')
+        self.app_description.default = app_data.get('description', '')
+        self.button_text.default = app_data.get('button_text', '')
+        self.staff_channel_id.default = str(app_data.get('staff_channel_id', '')) if app_data.get('staff_channel_id') else ''
+        self.member_role_id.default = str(app_data.get('member_role_id', '')) if app_data.get('member_role_id') else ''
+
+    app_name = discord.ui.TextInput(
+        label="Application Name",
+        placeholder="e.g., 'Staff Application', 'Member Application'",
+        max_length=100,
+        required=True
+    )
+
+    app_description = discord.ui.TextInput(
+        label="Application Description",
+        placeholder="Brief description of what this application is for...",
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=True
+    )
+
+    button_text = discord.ui.TextInput(
+        label="Button Text",
+        placeholder="e.g., 'Apply for Staff', 'Join Us'",
+        max_length=80,
+        required=False
+    )
+
+    staff_channel_id = discord.ui.TextInput(
+        label="Staff Channel ID (optional)",
+        placeholder="Channel ID where applications will be sent",
+        max_length=20,
+        required=False
+    )
+
+    member_role_id = discord.ui.TextInput(
+        label="Auto-assign Role ID (optional)",
+        placeholder="Role ID to assign when accepted",
+        max_length=20,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+
+        if self.app_id not in data.get('custom_applications', {}):
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        # Update the panel data
+        app_data = data['custom_applications'][self.app_id]
+        app_data['name'] = str(self.app_name.value)
+        app_data['description'] = str(self.app_description.value)
+        app_data['button_text'] = str(self.button_text.value) if self.button_text.value else f"Apply for {self.app_name.value}"
+        app_data['staff_channel_id'] = int(self.staff_channel_id.value) if self.staff_channel_id.value and self.staff_channel_id.value.isdigit() else None
+        app_data['member_role_id'] = int(self.member_role_id.value) if self.member_role_id.value and self.member_role_id.value.isdigit() else None
+
+        save_data(data)
+
+        await interaction.response.send_message(f"✅ Application panel '{self.app_name.value}' updated successfully!", ephemeral=True)
+
+@bot.tree.command(name="configapplication", description="Configure and manage application panels")
+async def config_application(interaction: discord.Interaction):
+    try:
+        if interaction.response.is_done():
+            return
+
+        view = ApplicationConfigView()
+        
+        embed = discord.Embed(
+            title="⚙️ Application Configuration Panel",
+            description="Manage your application panels and view pending applications.",
+            color=0x0099ff
+        )
+
+        embed.add_field(
+            name="📝 Edit Application Panels",
+            value="Modify existing application panel settings and fields",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📋 View Pending Applications",
+            value="See all pending applications across all panels",
+            inline=False
+        )
+
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    except discord.NotFound:
+        # Interaction expired, ignore silently
+        pass
+    except Exception as e:
+        print(f"Error in config_application: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
 # Run the bot
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 if TOKEN:
