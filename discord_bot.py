@@ -264,6 +264,16 @@ class EmbedOptionsView(discord.ui.View):
         modal = FieldModal(self.embed_data)
         await interaction.response.send_modal(modal)
 
+    @discord.ui.button(label="Manage Fields", style=discord.ButtonStyle.secondary, emoji="📋")
+    async def manage_fields(self, interaction: discord.Interaction, button: discord.ui.Button):
+        fields = self.embed_data.get('fields', [])
+        if not fields:
+            await interaction.response.send_message("No fields to manage! Add a field first.", ephemeral=True)
+            return
+        
+        view = FieldManagerView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message("**Field Manager:**\nSelect a field to edit or delete:", view=view, ephemeral=True)
+
     @discord.ui.button(label="Add Image", style=discord.ButtonStyle.secondary, emoji="🖼️")
     async def add_image(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = ImageModal(self.embed_data)
@@ -397,6 +407,10 @@ class TicketView(discord.ui.View):
     def __init__(self, button_text="Create Ticket"):
         super().__init__(timeout=None)
         self.button_text = button_text
+        # Update the button label after initialization
+        for item in self.children:
+            if hasattr(item, 'label') and item.label == "Create Ticket":
+                item.label = button_text
 
     @discord.ui.button(label="Create Ticket", style=discord.ButtonStyle.primary, emoji="🎫")
     async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -635,6 +649,76 @@ def create_embed_from_data(embed_data):
 
     return embed
 
+class FieldManagerView(discord.ui.View):
+    def __init__(self, embed_data, editing_embed_id=None):
+        super().__init__(timeout=300)
+        self.embed_data = embed_data
+        self.editing_embed_id = editing_embed_id
+        
+        # Create select menu for fields
+        fields = embed_data.get('fields', [])
+        options = []
+        for i, field in enumerate(fields):
+            field_name = field.get('name', f'Field {i+1}')
+            field_value = field.get('value', '')
+            # Truncate for display
+            if len(field_value) > 50:
+                field_value = field_value[:47] + "..."
+            
+            options.append(discord.SelectOption(
+                label=f"{i+1}. {field_name}"[:100],
+                value=str(i),
+                description=field_value[:100] if field_value else "No value"
+            ))
+        
+        if options:
+            self.select_field.options = options[:25]
+        else:
+            # Disable select if no fields
+            self.select_field.disabled = True
+
+    @discord.ui.select(placeholder="Choose a field to manage...")
+    async def select_field(self, interaction: discord.Interaction, select: discord.ui.Select):
+        field_index = int(select.values[0])
+        self.selected_field_index = field_index
+        
+        field = self.embed_data['fields'][field_index]
+        embed = discord.Embed(
+            title=f"📝 Field {field_index + 1}",
+            color=0x0099ff
+        )
+        embed.add_field(name="Name", value=field.get('name', 'No name'), inline=False)
+        embed.add_field(name="Value", value=field.get('value', 'No value'), inline=False)
+        embed.add_field(name="Inline", value=str(field.get('inline', False)), inline=False)
+        
+        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+
+    @discord.ui.button(label="Edit Selected Field", style=discord.ButtonStyle.primary, emoji="✏️")
+    async def edit_field(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not hasattr(self, 'selected_field_index'):
+            await interaction.response.send_message("❌ Please select a field first!", ephemeral=True)
+            return
+        
+        modal = FieldModal(self.embed_data, self.selected_field_index)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Delete Selected Field", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def delete_field(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not hasattr(self, 'selected_field_index'):
+            await interaction.response.send_message("❌ Please select a field first!", ephemeral=True)
+            return
+        
+        field_name = self.embed_data['fields'][self.selected_field_index].get('name', f'Field {self.selected_field_index + 1}')
+        del self.embed_data['fields'][self.selected_field_index]
+        
+        view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message(f"✅ Deleted field '{field_name}'. Continue editing:", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Back to Embed Editor", style=discord.ButtonStyle.secondary, emoji="↩️")
+    async def back_to_editor(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message("Back to embed editor:", view=view, ephemeral=True)
+
 class EmbedSelectView(discord.ui.View):
     def __init__(self, stored_embeds):
         super().__init__(timeout=300)
@@ -805,8 +889,30 @@ async def list_embeds(interaction: discord.Interaction):
         await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one.", ephemeral=True)
         return
 
+    # Create summary embed
+    summary_embed = discord.Embed(
+        title="📋 Stored Embeds Summary",
+        description=f"Total embeds: **{len(data['stored_embeds'])}**",
+        color=0x0099ff
+    )
+    
+    # Add quick summary of each embed
+    for embed_id, embed_data in list(data['stored_embeds'].items())[:10]:  # Limit to first 10
+        title = embed_data.get('title', 'No title')
+        field_count = len(embed_data.get('fields', []))
+        has_ticket = "🎫" if embed_data.get('has_ticket_system') else ""
+        
+        summary_embed.add_field(
+            name=f"{embed_id} {has_ticket}",
+            value=f"**Title:** {title[:50]}{'...' if len(title) > 50 else ''}\n**Fields:** {field_count}",
+            inline=True
+        )
+    
+    if len(data['stored_embeds']) > 10:
+        summary_embed.set_footer(text=f"Showing first 10 of {len(data['stored_embeds'])} embeds. Use the dropdown to see all.")
+
     view = EmbedSelectView(data['stored_embeds'])
-    await interaction.response.send_message(f"**Stored Embeds ({len(data['stored_embeds'])} total):**\nSelect an embed to view details:", view=view, ephemeral=True)
+    await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
 
 @bot.tree.command(name="spawnembed", description="Spawn a stored embed message")
 async def spawn_embed(interaction: discord.Interaction):
@@ -950,6 +1056,851 @@ async def ticket_list(interaction: discord.Interaction):
                 value=f"**User:** {user.mention}\n**Channel:** {channel.mention}\n**Created:** {ticket_info['created_at'][:10]}",
                 inline=True
             )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+class ApplicationCreateModal(discord.ui.Modal, title="Create Application Panel"):
+    def __init__(self):
+        super().__init__()
+
+    app_name = discord.ui.TextInput(
+        label="Application Name",
+        placeholder="e.g., 'Staff Application', 'Member Application'",
+        max_length=100,
+        required=True
+    )
+
+    app_description = discord.ui.TextInput(
+        label="Application Description",
+        placeholder="Brief description of what this application is for...",
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=True
+    )
+
+    button_text = discord.ui.TextInput(
+        label="Button Text",
+        placeholder="e.g., 'Apply for Staff', 'Join Us'",
+        max_length=80,
+        required=False
+    )
+
+    staff_channel_id = discord.ui.TextInput(
+        label="Staff Channel ID (optional)",
+        placeholder="Channel ID where applications will be sent",
+        max_length=20,
+        required=False
+    )
+
+    member_role_id = discord.ui.TextInput(
+        label="Auto-assign Role ID (optional)",
+        placeholder="Role ID to assign when accepted",
+        max_length=20,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+        
+        # Initialize custom applications if not exists
+        if 'custom_applications' not in data:
+            data['custom_applications'] = {}
+        if 'app_panel_counter' not in data:
+            data['app_panel_counter'] = 1
+
+        app_id = f"app_panel_{data['app_panel_counter']}"
+        
+        app_panel_data = {
+            'name': str(self.app_name.value),
+            'description': str(self.app_description.value),
+            'button_text': str(self.button_text.value) if self.button_text.value else f"Apply for {self.app_name.value}",
+            'staff_channel_id': int(self.staff_channel_id.value) if self.staff_channel_id.value and self.staff_channel_id.value.isdigit() else None,
+            'member_role_id': int(self.member_role_id.value) if self.member_role_id.value and self.member_role_id.value.isdigit() else None,
+            'fields': [],
+            'created_by': interaction.user.id,
+            'created_at': datetime.now().isoformat(),
+            'applications': {}
+        }
+
+        data['custom_applications'][app_id] = app_panel_data
+        data['app_panel_counter'] += 1
+        save_data(data)
+
+        view = ApplicationFieldsView(app_id)
+        await interaction.response.send_message(f"✅ Application panel '{self.app_name.value}' created! (ID: {app_id})\n\nNow add fields to your application form:", view=view, ephemeral=True)
+
+class ApplicationFieldModal(discord.ui.Modal, title="Add Application Field"):
+    def __init__(self, app_id):
+        super().__init__()
+        self.app_id = app_id
+
+    field_label = discord.ui.TextInput(
+        label="Field Label",
+        placeholder="e.g., 'Experience', 'Age', 'Timezone'",
+        max_length=45,
+        required=True
+    )
+
+    field_placeholder = discord.ui.TextInput(
+        label="Field Placeholder",
+        placeholder="Placeholder text for this field...",
+        max_length=100,
+        required=False
+    )
+
+    field_type = discord.ui.TextInput(
+        label="Field Type",
+        placeholder="short (single line) or long (paragraph)",
+        max_length=10,
+        required=False
+    )
+
+    max_length = discord.ui.TextInput(
+        label="Max Length",
+        placeholder="Maximum characters (default: 1000)",
+        max_length=4,
+        required=False
+    )
+
+    required = discord.ui.TextInput(
+        label="Required",
+        placeholder="true or false (default: true)",
+        max_length=5,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+        
+        if self.app_id not in data.get('custom_applications', {}):
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        field_type = self.field_type.value.lower() if self.field_type.value else "short"
+        max_len = int(self.max_length.value) if self.max_length.value and self.max_length.value.isdigit() else 1000
+        is_required = self.required.value.lower() != "false" if self.required.value else True
+
+        field_data = {
+            'label': str(self.field_label.value),
+            'placeholder': str(self.field_placeholder.value) if self.field_placeholder.value else f"Enter {self.field_label.value.lower()}...",
+            'type': 'paragraph' if field_type in ['long', 'paragraph'] else 'short',
+            'max_length': min(max_len, 4000),
+            'required': is_required
+        }
+
+        data['custom_applications'][self.app_id]['fields'].append(field_data)
+        save_data(data)
+
+        view = ApplicationFieldsView(self.app_id)
+        await interaction.response.send_message(f"✅ Field '{self.field_label.value}' added! Continue managing fields:", view=view, ephemeral=True)
+
+class ApplicationFieldsView(discord.ui.View):
+    def __init__(self, app_id):
+        super().__init__(timeout=300)
+        self.app_id = app_id
+
+    @discord.ui.button(label="Add Field", style=discord.ButtonStyle.primary, emoji="➕")
+    async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        if len(app_data.get('fields', [])) >= 5:
+            await interaction.response.send_message("❌ Maximum 5 fields allowed per application!", ephemeral=True)
+            return
+
+        modal = ApplicationFieldModal(self.app_id)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Preview Panel", style=discord.ButtonStyle.secondary, emoji="👁️")
+    async def preview_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=f"📋 {app_data['name']} - Application Panel",
+            description=app_data['description'],
+            color=0x0099ff,
+            timestamp=datetime.now()
+        )
+        
+        if app_data.get('fields'):
+            field_list = "\n".join([f"• {field['label']} ({'Required' if field['required'] else 'Optional'})" for field in app_data['fields']])
+            embed.add_field(name="📝 Application Fields", value=field_list, inline=False)
+        else:
+            embed.add_field(name="⚠️ No Fields", value="Add at least one field before deploying this panel.", inline=False)
+
+        embed.set_footer(text="Application Panel Preview")
+
+        preview_view = CustomApplicationPanelView(self.app_id)
+        await interaction.response.send_message("**Preview:**", embed=embed, view=preview_view, ephemeral=True)
+
+    @discord.ui.button(label="Deploy Panel", style=discord.ButtonStyle.success, emoji="🚀")
+    async def deploy_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        if not app_data.get('fields'):
+            await interaction.response.send_message("❌ Please add at least one field before deploying!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=f"📋 {app_data['name']} - Application Panel",
+            description=app_data['description'],
+            color=0x0099ff,
+            timestamp=datetime.now()
+        )
+        
+        embed.add_field(
+            name="📝 How to Apply",
+            value=f"Click the **{app_data['button_text']}** button below to start your application.",
+            inline=False
+        )
+        
+        field_list = "\n".join([f"• {field['label']}" for field in app_data['fields']])
+        embed.add_field(name="📋 Application Fields", value=field_list, inline=False)
+        
+        embed.set_footer(text="Custom Application System")
+
+        if interaction.guild and interaction.guild.icon:
+            embed.set_thumbnail(url=interaction.guild.icon.url)
+
+        view = CustomApplicationPanelView(self.app_id)
+        
+        await interaction.response.send_message(f"✅ Application panel '{app_data['name']}' deployed!", ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view)
+
+class CustomApplicationPanelView(discord.ui.View):
+    def __init__(self, app_id):
+        super().__init__(timeout=None)
+        self.app_id = app_id
+        
+        # Update button label
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(app_id, {})
+        if app_data.get('button_text'):
+            for item in self.children:
+                if hasattr(item, 'label'):
+                    item.label = app_data['button_text']
+
+    @discord.ui.button(label="Apply", style=discord.ButtonStyle.primary, emoji="📝")
+    async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        
+        if not app_data:
+            await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
+            return
+
+        # Check if user already has a pending application for this panel
+        user_applications = [app for app in app_data.get('applications', {}).values() 
+                           if app['user_id'] == interaction.user.id and app['status'] == 'pending']
+        
+        if user_applications:
+            await interaction.response.send_message(f"❌ You already have a pending application for {app_data['name']}! Please wait for it to be reviewed.", ephemeral=True)
+            return
+
+        modal = DynamicApplicationModal(self.app_id, app_data)
+        await interaction.response.send_modal(modal)
+
+class DynamicApplicationModal(discord.ui.Modal):
+    def __init__(self, app_id, app_data):
+        super().__init__(title=f"{app_data['name']} Application")
+        self.app_id = app_id
+        self.app_data = app_data
+        
+        # Add fields dynamically
+        for i, field in enumerate(app_data.get('fields', [])[:5]):  # Discord limit of 5 components
+            text_input = discord.ui.TextInput(
+                label=field['label'],
+                placeholder=field['placeholder'],
+                style=discord.TextStyle.paragraph if field['type'] == 'paragraph' else discord.TextStyle.short,
+                max_length=field['max_length'],
+                required=field['required']
+            )
+            setattr(self, f'field_{i}', text_input)
+            self.add_item(text_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+        
+        if 'application_counter' not in data:
+            data['application_counter'] = 1
+
+        application_id = f"app_{data['application_counter']}"
+        
+        # Collect field responses
+        responses = {}
+        for i, field in enumerate(self.app_data.get('fields', [])):
+            if hasattr(self, f'field_{i}'):
+                responses[field['label']] = str(getattr(self, f'field_{i}').value)
+
+        application_data = {
+            'user_id': interaction.user.id,
+            'responses': responses,
+            'status': 'pending',
+            'submitted_at': datetime.now().isoformat(),
+            'reviewed_by': None,
+            'review_notes': None
+        }
+
+        data['custom_applications'][self.app_id]['applications'][application_id] = application_data
+        data['application_counter'] += 1
+        save_data(data)
+
+        # Create confirmation embed
+        confirm_embed = discord.Embed(
+            title="✅ Application Submitted Successfully!",
+            description=f"Thank you for applying for {self.app_data['name']}, {interaction.user.mention}!",
+            color=0x00ff00,
+            timestamp=datetime.now()
+        )
+        confirm_embed.add_field(name="Application ID", value=application_id, inline=True)
+        confirm_embed.add_field(name="Status", value="Pending Review", inline=True)
+        confirm_embed.set_footer(text="Custom Application System")
+
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+
+        # Send notification to staff channel if configured
+        if self.app_data.get('staff_channel_id'):
+            staff_channel = interaction.guild.get_channel(self.app_data['staff_channel_id'])
+            if staff_channel:
+                staff_embed = discord.Embed(
+                    title=f"📋 New {self.app_data['name']} Application",
+                    description=f"**Applicant:** {interaction.user.mention}\n**Application ID:** {application_id}",
+                    color=0x0099ff,
+                    timestamp=datetime.now()
+                )
+                
+                for field_name, response in responses.items():
+                    staff_embed.add_field(
+                        name=field_name,
+                        value=response[:100] + "..." if len(response) > 100 else response,
+                        inline=False
+                    )
+                
+                review_view = CustomApplicationReviewView(self.app_id, application_id)
+                await staff_channel.send(embed=staff_embed, view=review_view)
+
+class CustomApplicationReviewView(discord.ui.View):
+    def __init__(self, app_id, application_id):
+        super().__init__(timeout=None)
+        self.app_id = app_id
+        self.application_id = application_id
+
+    @discord.ui.button(label="View Full Application", style=discord.ButtonStyle.primary, emoji="📄")
+    async def view_application(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        if not app_data or self.application_id not in app_data.get('applications', {}):
+            await interaction.response.send_message("❌ Application not found!", ephemeral=True)
+            return
+
+        application = app_data['applications'][self.application_id]
+        applicant = interaction.guild.get_member(application['user_id'])
+
+        embed = discord.Embed(
+            title=f"📋 {app_data['name']} Application Details",
+            description=f"**Application ID:** {self.application_id}",
+            color=0x0099ff,
+            timestamp=datetime.fromisoformat(application['submitted_at'])
+        )
+        
+        embed.add_field(name="👤 Applicant", value=f"{applicant.mention if applicant else 'Unknown User'}", inline=True)
+        embed.add_field(name="📊 Status", value=application['status'].title(), inline=True)
+
+        for field_name, response in application['responses'].items():
+            embed.add_field(name=field_name, value=response, inline=False)
+
+        if application.get('reviewed_by'):
+            reviewer = interaction.guild.get_member(application['reviewed_by'])
+            embed.add_field(name="👨‍💼 Reviewed By", value=reviewer.mention if reviewer else "Unknown", inline=True)
+        
+        if application.get('review_notes'):
+            embed.add_field(name="📝 Review Notes", value=application['review_notes'], inline=False)
+
+        embed.set_footer(text="Custom Application System")
+
+        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, emoji="✅")
+    async def accept_application(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = CustomApplicationReviewModal(self.app_id, self.application_id, "accepted")
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reject_application(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = CustomApplicationReviewModal(self.app_id, self.application_id, "rejected")
+        await interaction.response.send_modal(modal)
+
+class CustomApplicationReviewModal(discord.ui.Modal, title="Review Application"):
+    def __init__(self, app_id, application_id, decision):
+        super().__init__()
+        self.app_id = app_id
+        self.application_id = application_id
+        self.decision = decision
+        self.title = f"{'Accept' if decision == 'accepted' else 'Reject'} Application"
+
+    review_notes = discord.ui.TextInput(
+        label="Review Notes",
+        placeholder="Add any notes about this decision...",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+        
+        app_data = data.get('custom_applications', {}).get(self.app_id)
+        if not app_data or self.application_id not in app_data.get('applications', {}):
+            await interaction.response.send_message("❌ Application not found!", ephemeral=True)
+            return
+
+        application = app_data['applications'][self.application_id]
+        application['status'] = self.decision
+        application['reviewed_by'] = interaction.user.id
+        application['review_notes'] = str(self.review_notes.value) if self.review_notes.value else None
+        application['reviewed_at'] = datetime.now().isoformat()
+
+        save_data(data)
+
+        # Notify the applicant
+        applicant = interaction.guild.get_member(application['user_id'])
+        if applicant:
+            status_color = 0x00ff00 if self.decision == "accepted" else 0xff0000
+            status_emoji = "✅" if self.decision == "accepted" else "❌"
+            
+            dm_embed = discord.Embed(
+                title=f"{status_emoji} {app_data['name']} Application {self.decision.title()}",
+                description=f"Your application for {app_data['name']} has been **{self.decision}**.",
+                color=status_color,
+                timestamp=datetime.now()
+            )
+            
+            if self.review_notes.value:
+                dm_embed.add_field(name="Review Notes", value=self.review_notes.value, inline=False)
+            
+            dm_embed.set_footer(text="Custom Application System")
+
+            try:
+                await applicant.send(embed=dm_embed)
+            except discord.Forbidden:
+                pass
+
+            # If accepted, add role if configured
+            if self.decision == "accepted" and app_data.get('member_role_id'):
+                role = interaction.guild.get_role(app_data['member_role_id'])
+                if role:
+                    try:
+                        await applicant.add_roles(role)
+                    except discord.Forbidden:
+                        pass
+
+        await interaction.response.send_message(f"✅ Application {self.decision}! Applicant has been notified.", ephemeral=True)
+
+class RIAApplicationModal(discord.ui.Modal, title="RIA Application Form"):
+    def __init__(self):
+        super().__init__()
+
+    username = discord.ui.TextInput(
+        label="Discord Username",
+        placeholder="Your Discord username...",
+        max_length=100,
+        required=True
+    )
+
+    age = discord.ui.TextInput(
+        label="Age",
+        placeholder="Your age...",
+        max_length=3,
+        required=True
+    )
+
+    experience = discord.ui.TextInput(
+        label="Previous Experience",
+        placeholder="Describe your previous experience with similar communities...",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+
+    motivation = discord.ui.TextInput(
+        label="Why do you want to join RIA?",
+        placeholder="Tell us why you're interested in joining RIA...",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=True
+    )
+
+    availability = discord.ui.TextInput(
+        label="Availability",
+        placeholder="What times/days are you typically available?",
+        style=discord.TextStyle.paragraph,
+        max_length=500,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+
+        # Initialize RIA applications if not exists
+        if 'ria_applications' not in data:
+            data['ria_applications'] = {}
+        if 'ria_application_counter' not in data:
+            data['ria_application_counter'] = 1
+
+        application_id = f"ria_app_{data['ria_application_counter']}"
+        
+        application_data = {
+            'user_id': interaction.user.id,
+            'username': str(self.username.value),
+            'age': str(self.age.value),
+            'experience': str(self.experience.value),
+            'motivation': str(self.motivation.value),
+            'availability': str(self.availability.value),
+            'status': 'pending',
+            'submitted_at': datetime.now().isoformat(),
+            'reviewed_by': None,
+            'review_notes': None
+        }
+
+        data['ria_applications'][application_id] = application_data
+        data['ria_application_counter'] += 1
+        save_data(data)
+
+        # Create confirmation embed
+        confirm_embed = discord.Embed(
+            title="✅ Application Submitted Successfully!",
+            description=f"Thank you for applying to join RIA, {interaction.user.mention}!",
+            color=0x00ff00,
+            timestamp=datetime.now()
+        )
+        confirm_embed.add_field(name="Application ID", value=application_id, inline=True)
+        confirm_embed.add_field(name="Status", value="Pending Review", inline=True)
+        confirm_embed.add_field(name="Next Steps", value="Our team will review your application and get back to you soon!", inline=False)
+        confirm_embed.set_footer(text="RIA Application System")
+
+        await interaction.response.send_message(embed=confirm_embed, ephemeral=True)
+
+        # Send notification to staff channel (if configured)
+        if data.get('ria_settings', {}).get('staff_channel_id'):
+            staff_channel = interaction.guild.get_channel(data['ria_settings']['staff_channel_id'])
+            if staff_channel:
+                staff_embed = discord.Embed(
+                    title="📋 New RIA Application",
+                    description=f"**Applicant:** {interaction.user.mention}\n**Application ID:** {application_id}",
+                    color=0x0099ff,
+                    timestamp=datetime.now()
+                )
+                staff_embed.add_field(name="Username", value=self.username.value, inline=True)
+                staff_embed.add_field(name="Age", value=self.age.value, inline=True)
+                staff_embed.add_field(name="Experience", value=self.experience.value[:100] + "..." if len(self.experience.value) > 100 else self.experience.value, inline=False)
+                
+                review_view = RIAApplicationReviewView(application_id)
+                await staff_channel.send(embed=staff_embed, view=review_view)
+
+class RIAApplicationReviewView(discord.ui.View):
+    def __init__(self, application_id):
+        super().__init__(timeout=None)
+        self.application_id = application_id
+
+    @discord.ui.button(label="View Full Application", style=discord.ButtonStyle.primary, emoji="📄")
+    async def view_application(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        
+        if self.application_id not in data.get('ria_applications', {}):
+            await interaction.response.send_message("❌ Application not found!", ephemeral=True)
+            return
+
+        app_data = data['ria_applications'][self.application_id]
+        applicant = interaction.guild.get_member(app_data['user_id'])
+
+        embed = discord.Embed(
+            title="📋 RIA Application Details",
+            description=f"**Application ID:** {self.application_id}",
+            color=0x0099ff,
+            timestamp=datetime.fromisoformat(app_data['submitted_at'])
+        )
+        
+        embed.add_field(name="👤 Applicant", value=f"{applicant.mention if applicant else 'Unknown User'}", inline=True)
+        embed.add_field(name="📝 Username", value=app_data['username'], inline=True)
+        embed.add_field(name="🎂 Age", value=app_data['age'], inline=True)
+        embed.add_field(name="💼 Experience", value=app_data['experience'], inline=False)
+        embed.add_field(name="💭 Motivation", value=app_data['motivation'], inline=False)
+        embed.add_field(name="⏰ Availability", value=app_data['availability'], inline=False)
+        embed.add_field(name="📊 Status", value=app_data['status'].title(), inline=True)
+
+        if app_data.get('reviewed_by'):
+            reviewer = interaction.guild.get_member(app_data['reviewed_by'])
+            embed.add_field(name="👨‍💼 Reviewed By", value=reviewer.mention if reviewer else "Unknown", inline=True)
+        
+        if app_data.get('review_notes'):
+            embed.add_field(name="📝 Review Notes", value=app_data['review_notes'], inline=False)
+
+        embed.set_footer(text="RIA Application System")
+
+        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+
+    @discord.ui.button(label="Accept", style=discord.ButtonStyle.success, emoji="✅")
+    async def accept_application(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = RIAReviewModal(self.application_id, "accepted")
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Reject", style=discord.ButtonStyle.danger, emoji="❌")
+    async def reject_application(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = RIAReviewModal(self.application_id, "rejected")
+        await interaction.response.send_modal(modal)
+
+class RIAReviewModal(discord.ui.Modal, title="Review RIA Application"):
+    def __init__(self, application_id, decision):
+        super().__init__()
+        self.application_id = application_id
+        self.decision = decision
+        self.title = f"{'Accept' if decision == 'accepted' else 'Reject'} Application"
+
+    review_notes = discord.ui.TextInput(
+        label="Review Notes",
+        placeholder="Add any notes about this decision...",
+        style=discord.TextStyle.paragraph,
+        max_length=1000,
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = load_data()
+        
+        if self.application_id not in data.get('ria_applications', {}):
+            await interaction.response.send_message("❌ Application not found!", ephemeral=True)
+            return
+
+        app_data = data['ria_applications'][self.application_id]
+        app_data['status'] = self.decision
+        app_data['reviewed_by'] = interaction.user.id
+        app_data['review_notes'] = str(self.review_notes.value) if self.review_notes.value else None
+        app_data['reviewed_at'] = datetime.now().isoformat()
+
+        save_data(data)
+
+        # Notify the applicant
+        applicant = interaction.guild.get_member(app_data['user_id'])
+        if applicant:
+            status_color = 0x00ff00 if self.decision == "accepted" else 0xff0000
+            status_emoji = "✅" if self.decision == "accepted" else "❌"
+            
+            dm_embed = discord.Embed(
+                title=f"{status_emoji} RIA Application {self.decision.title()}",
+                description=f"Your application to join RIA has been **{self.decision}**.",
+                color=status_color,
+                timestamp=datetime.now()
+            )
+            
+            if self.review_notes.value:
+                dm_embed.add_field(name="Review Notes", value=self.review_notes.value, inline=False)
+            
+            dm_embed.set_footer(text="RIA Application System")
+
+            try:
+                await applicant.send(embed=dm_embed)
+            except discord.Forbidden:
+                # If can't DM, mention in the current channel
+                await interaction.followup.send(f"{applicant.mention} Your RIA application has been **{self.decision}**.", ephemeral=True)
+
+            # If accepted, add role if configured
+            if self.decision == "accepted" and data.get('ria_settings', {}).get('member_role_id'):
+                role = interaction.guild.get_role(data['ria_settings']['member_role_id'])
+                if role:
+                    try:
+                        await applicant.add_roles(role)
+                    except discord.Forbidden:
+                        pass
+
+        await interaction.response.send_message(f"✅ Application {self.decision}! Applicant has been notified.", ephemeral=True)
+
+class RIAApplicationPanelView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Apply to Join RIA", style=discord.ButtonStyle.primary, emoji="📝")
+    async def apply_to_ria(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        
+        # Check if user already has a pending application
+        user_applications = [app for app in data.get('ria_applications', {}).values() 
+                           if app['user_id'] == interaction.user.id and app['status'] == 'pending']
+        
+        if user_applications:
+            await interaction.response.send_message("❌ You already have a pending application! Please wait for it to be reviewed.", ephemeral=True)
+            return
+
+        modal = RIAApplicationModal()
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Check Application Status", style=discord.ButtonStyle.secondary, emoji="📊")
+    async def check_status(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        
+        user_applications = [app for app_id, app in data.get('ria_applications', {}).items() 
+                           if app['user_id'] == interaction.user.id]
+        
+        if not user_applications:
+            await interaction.response.send_message("❌ You don't have any applications on file.", ephemeral=True)
+            return
+
+        # Show the most recent application
+        latest_app = max(user_applications, key=lambda x: x['submitted_at'])
+        
+        status_colors = {'pending': 0xffff00, 'accepted': 0x00ff00, 'rejected': 0xff0000}
+        status_emoji = {'pending': '⏳', 'accepted': '✅', 'rejected': '❌'}
+        
+        embed = discord.Embed(
+            title="📊 Your RIA Application Status",
+            color=status_colors.get(latest_app['status'], 0x0099ff),
+            timestamp=datetime.fromisoformat(latest_app['submitted_at'])
+        )
+        
+        embed.add_field(name="Status", value=f"{status_emoji.get(latest_app['status'], '❓')} {latest_app['status'].title()}", inline=True)
+        embed.add_field(name="Submitted", value=latest_app['submitted_at'][:10], inline=True)
+        
+        if latest_app.get('reviewed_at'):
+            embed.add_field(name="Reviewed", value=latest_app['reviewed_at'][:10], inline=True)
+        
+        if latest_app.get('review_notes'):
+            embed.add_field(name="Review Notes", value=latest_app['review_notes'], inline=False)
+        
+        embed.set_footer(text="RIA Application System")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="ria_panel", description="Create the RIA application panel")
+async def ria_panel(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🌟 Join RIA - Application Panel",
+        description="Welcome to the RIA recruitment center! We're looking for dedicated individuals to join our community.",
+        color=0x0099ff,
+        timestamp=datetime.now()
+    )
+    
+    embed.add_field(
+        name="📋 How to Apply",
+        value="Click the **Apply to Join RIA** button below to start your application process.",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📊 Application Process",
+        value="1. Fill out the application form\n2. Wait for review by our team\n3. Receive notification of decision",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="❓ Questions?",
+        value="If you have any questions about the application process, feel free to create a support ticket.",
+        inline=False
+    )
+    
+    embed.set_footer(text="RIA Recruitment System")
+    
+    # Check if the interaction is in a guild and has an icon
+    if interaction.guild and interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
+
+    view = RIAApplicationPanelView()
+    
+    await interaction.response.send_message("RIA Application Panel created!", ephemeral=True)
+    await interaction.followup.send(embed=embed, view=view)
+
+@bot.tree.command(name="ria_config", description="Configure RIA application settings")
+async def ria_config(interaction: discord.Interaction, staff_channel: discord.TextChannel = None, member_role: discord.Role = None):
+    data = load_data()
+    
+    if 'ria_settings' not in data:
+        data['ria_settings'] = {}
+
+    if staff_channel:
+        data['ria_settings']['staff_channel_id'] = staff_channel.id
+
+    if member_role:
+        data['ria_settings']['member_role_id'] = member_role.id
+
+    save_data(data)
+
+    embed = discord.Embed(
+        title="⚙️ RIA Configuration Updated",
+        color=0x00ff00
+    )
+    embed.add_field(name="Staff Channel", value=staff_channel.mention if staff_channel else "Not set", inline=True)
+    embed.add_field(name="Member Role", value=member_role.mention if member_role else "Not set", inline=True)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="applicationcreate", description="Create a custom application panel")
+async def application_create(interaction: discord.Interaction):
+    modal = ApplicationCreateModal()
+    await interaction.response.send_modal(modal)
+
+@bot.tree.command(name="ria_applications", description="View all RIA applications")
+async def ria_applications(interaction: discord.Interaction, status: str = None):
+    data = load_data()
+    applications = data.get('ria_applications', {})
+
+    if not applications:
+        await interaction.response.send_message("📋 No applications found!", ephemeral=True)
+        return
+
+    # Filter by status if provided
+    if status:
+        filtered_apps = {app_id: app for app_id, app in applications.items() if app['status'] == status.lower()}
+        applications = filtered_apps
+
+    if not applications:
+        await interaction.response.send_message(f"📋 No applications found with status: {status}", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="📋 RIA Applications",
+        description=f"Total applications: **{len(applications)}**",
+        color=0x0099ff,
+        timestamp=datetime.now()
+    )
+
+    # Show summary of applications
+    status_counts = {}
+    for app in applications.values():
+        status_counts[app['status']] = status_counts.get(app['status'], 0) + 1
+
+    summary = "\n".join([f"**{status.title()}:** {count}" for status, count in status_counts.items()])
+    embed.add_field(name="📊 Status Summary", value=summary, inline=False)
+
+    # Show recent applications
+    recent_apps = sorted(applications.items(), key=lambda x: x[1]['submitted_at'], reverse=True)[:5]
+    
+    for app_id, app_data in recent_apps:
+        applicant = interaction.guild.get_member(app_data['user_id'])
+        applicant_name = applicant.display_name if applicant else "Unknown User"
+        
+        status_emoji = {'pending': '⏳', 'accepted': '✅', 'rejected': '❌'}
+        
+        embed.add_field(
+            name=f"{status_emoji.get(app_data['status'], '❓')} {app_id}",
+            value=f"**Applicant:** {applicant_name}\n**Status:** {app_data['status'].title()}\n**Submitted:** {app_data['submitted_at'][:10]}",
+            inline=True
+        )
+
+    if len(applications) > 5:
+        embed.set_footer(text=f"Showing 5 most recent of {len(applications)} applications")
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
