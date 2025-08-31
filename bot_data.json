@@ -12,5 +12,21 @@
   },
   "automod_words": [],
   "automod_enabled": true,
-  "scheduled_announcements": {}
+  "scheduled_announcements": {},
+  "ria_settings": {},
+  "ria_applications": {
+    "ria_app_1": {
+      "user_id": 1385239185006268457,
+      "username": "Hhhh",
+      "age": "In",
+      "experience": "Yuchi",
+      "motivation": "G",
+      "availability": "Ban",
+      "status": "pending",
+      "submitted_at": "2025-08-31T19:24:48.720598",
+      "reviewed_by": null,
+      "review_notes": null
+    }
+  },
+  "ria_application_counter": 2
 }
