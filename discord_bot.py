@@ -18,14 +18,26 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 def load_data():
     try:
         with open('bot_data.json', 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {
+            data = json.load(f)
+            # Ensure all required keys exist
+            if 'stored_embeds' not in data:
+                data['stored_embeds'] = {}
+            if 'embed_counter' not in data:
+                data['embed_counter'] = 1
+            if 'ticket_counter' not in data:
+                data['ticket_counter'] = 1
+            if 'active_tickets' not in data:
+                data['active_tickets'] = {}
+            return data
+    except (FileNotFoundError, json.JSONDecodeError):
+        default_data = {
             "ticket_counter": 1,
             "active_tickets": {},
             "stored_embeds": {},
             "embed_counter": 1
         }
+        save_data(default_data)
+        return default_data
 
 def save_data(data):
     with open('bot_data.json', 'w') as f:
@@ -43,9 +55,10 @@ async def on_ready():
         print(f"❌ Failed to sync commands: {e}")
 
 class EmbedModal(discord.ui.Modal, title="Create Embed"):
-    def __init__(self, embed_data=None):
+    def __init__(self, embed_data=None, editing_embed_id=None):
         super().__init__()
         self.embed_data = embed_data or {}
+        self.editing_embed_id = editing_embed_id
         
         # Pre-fill if editing
         self.title_input.default = self.embed_data.get('title', '')
@@ -105,8 +118,9 @@ class EmbedModal(discord.ui.Modal, title="Create Embed"):
             'ticket_category_id': self.embed_data.get('ticket_category_id')
         }
         
-        view = EmbedOptionsView(embed_data)
-        await interaction.response.send_message("Embed created! Choose additional options:", view=view, ephemeral=True)
+        view = EmbedOptionsView(embed_data, self.editing_embed_id)
+        action_text = "updated" if self.editing_embed_id else "created"
+        await interaction.response.send_message(f"Embed {action_text}! Choose additional options:", view=view, ephemeral=True)
 
 class FieldModal(discord.ui.Modal, title="Add Field"):
     def __init__(self, embed_data, field_index=None):
@@ -197,9 +211,10 @@ class TicketModal(discord.ui.Modal, title="Ticket System Settings"):
         await interaction.response.send_message("Ticket system configured! Continue editing:", view=view, ephemeral=True)
 
 class EmbedOptionsView(discord.ui.View):
-    def __init__(self, embed_data):
+    def __init__(self, embed_data, editing_embed_id=None):
         super().__init__(timeout=300)
         self.embed_data = embed_data
+        self.editing_embed_id = editing_embed_id
 
     @discord.ui.button(label="Add Field", style=discord.ButtonStyle.primary, emoji="📝")
     async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -231,6 +246,28 @@ class EmbedOptionsView(discord.ui.View):
             
         await interaction.response.send_message("**Preview:**", embed=embed, view=view, ephemeral=True)
 
+    @discord.ui.button(label="Save Changes", style=discord.ButtonStyle.primary, emoji="💾")
+    async def save_changes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        data = load_data()
+        
+        if self.editing_embed_id:
+            # Update existing embed - don't create a new one
+            data['stored_embeds'][self.editing_embed_id] = self.embed_data.copy()
+            embed_id = self.editing_embed_id
+            action_text = "updated and saved"
+        else:
+            # Create new embed
+            embed_id = f"embed_{data.get('embed_counter', 1)}"
+            data['stored_embeds'][embed_id] = self.embed_data.copy()
+            data['embed_counter'] = data.get('embed_counter', 1) + 1
+            action_text = "saved"
+            # Update the view to show we're now editing this embed
+            self.editing_embed_id = embed_id
+        
+        save_data(data)
+        
+        await interaction.response.send_message(f"✅ Embed {action_text}! (ID: {embed_id})", ephemeral=True)
+
     @discord.ui.button(label="Send Embed", style=discord.ButtonStyle.success, emoji="✅")
     async def send_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = create_embed_from_data(self.embed_data)
@@ -239,14 +276,26 @@ class EmbedOptionsView(discord.ui.View):
         if self.embed_data.get('has_ticket_system'):
             view = TicketView()
         
-        # Save embed
+        # Save embed if not already saved
         data = load_data()
-        embed_id = f"embed_{data['embed_counter']}"
-        data['stored_embeds'][embed_id] = self.embed_data
-        data['embed_counter'] += 1
+        
+        if self.editing_embed_id:
+            # Update existing embed - don't create a new one
+            data['stored_embeds'][self.editing_embed_id] = self.embed_data.copy()
+            embed_id = self.editing_embed_id
+            action_text = "updated and sent"
+        else:
+            # Create new embed
+            embed_id = f"embed_{data.get('embed_counter', 1)}"
+            data['stored_embeds'][embed_id] = self.embed_data.copy()
+            data['embed_counter'] = data.get('embed_counter', 1) + 1
+            action_text = "sent"
+            # Update the view to show we're now editing this embed
+            self.editing_embed_id = embed_id
+        
         save_data(data)
         
-        await interaction.response.send_message(f"Embed sent! (ID: {embed_id})", ephemeral=True)
+        await interaction.response.send_message(f"Embed {action_text}! (ID: {embed_id})", ephemeral=True)
         await interaction.followup.send(embed=embed, view=view)
 
 class ImageModal(discord.ui.Modal, title="Add Image"):
@@ -433,6 +482,9 @@ def create_embed_from_data(embed_data):
 
 @bot.tree.command(name="create_embed", description="Create a custom embed message")
 async def create_embed(interaction: discord.Interaction):
+    if interaction.response.is_done():
+        return
+        
     modal = EmbedModal()
     await interaction.response.send_modal(modal)
 
@@ -445,27 +497,134 @@ async def edit_embed(interaction: discord.Interaction, embed_id: str):
         return
     
     embed_data = data['stored_embeds'][embed_id]
-    modal = EmbedModal(embed_data)
+    modal = EmbedModal(embed_data, embed_id)
     await interaction.response.send_modal(modal)
+
+class EmbedSelectView(discord.ui.View):
+    def __init__(self, stored_embeds):
+        super().__init__(timeout=300)
+        self.stored_embeds = stored_embeds
+        
+        # Create select menu options
+        options = []
+        for embed_id, embed_data in stored_embeds.items():
+            title = embed_data.get('title', 'No title')
+            description = embed_data.get('description', '')
+            # Truncate description for option description
+            if description and len(description) > 100:
+                description = description[:97] + "..."
+            
+            options.append(discord.SelectOption(
+                label=f"{embed_id}: {title}"[:100],  # Discord limit
+                value=embed_id,
+                description=description[:100] if description else "No description"
+            ))
+        
+        self.select_embed.options = options[:25]  # Discord limit
+
+    @discord.ui.select(placeholder="Choose an embed to view...")
+    async def select_embed(self, interaction: discord.Interaction, select: discord.ui.Select):
+        embed_id = select.values[0]
+        embed_data = self.stored_embeds[embed_id]
+        
+        # Create preview embed
+        preview_embed = create_embed_from_data(embed_data)
+        
+        # Add metadata
+        info_embed = discord.Embed(
+            title=f"📋 Embed Details: {embed_id}",
+            color=0x0099ff
+        )
+        info_embed.add_field(name="Title", value=embed_data.get('title', 'No title'), inline=True)
+        info_embed.add_field(name="Has Ticket System", value="Yes" if embed_data.get('has_ticket_system') else "No", inline=True)
+        info_embed.add_field(name="Fields Count", value=len(embed_data.get('fields', [])), inline=True)
+        
+        await interaction.response.send_message(embeds=[info_embed, preview_embed], ephemeral=True)
+
+class SpawnEmbedSelectView(discord.ui.View):
+    def __init__(self, stored_embeds):
+        super().__init__(timeout=300)
+        self.stored_embeds = stored_embeds
+        
+        # Create select menu options
+        options = []
+        for embed_id, embed_data in stored_embeds.items():
+            title = embed_data.get('title', 'No title')
+            description = embed_data.get('description', '')
+            # Truncate description for option description
+            if description and len(description) > 100:
+                description = description[:97] + "..."
+            
+            options.append(discord.SelectOption(
+                label=f"{embed_id}: {title}"[:100],  # Discord limit
+                value=embed_id,
+                description=description[:100] if description else "No description"
+            ))
+        
+        self.select_embed.options = options[:25]  # Discord limit
+
+    @discord.ui.select(placeholder="Choose an embed to spawn...")
+    async def select_embed(self, interaction: discord.Interaction, select: discord.ui.Select):
+        embed_id = select.values[0]
+        embed_data = self.stored_embeds[embed_id]
+        
+        # Create the embed
+        embed = create_embed_from_data(embed_data)
+        view = None
+        
+        if embed_data.get('has_ticket_system'):
+            view = TicketView()
+        
+        # Send the embed to the channel
+        if view is not None:
+            await interaction.response.send_message(embed=embed, view=view)
+        else:
+            await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="list_embeds", description="List all stored embeds")
 async def list_embeds(interaction: discord.Interaction):
+    if interaction.response.is_done():
+        return
+        
     data = load_data()
     
-    if not data['stored_embeds']:
-        await interaction.response.send_message("No embeds stored!", ephemeral=True)
+    if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
+        await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one.", ephemeral=True)
         return
     
-    embed_list = "\n".join([f"**{embed_id}**: {embed_data.get('title', 'No title')}" 
-                           for embed_id, embed_data in data['stored_embeds'].items()])
+    view = EmbedSelectView(data['stored_embeds'])
+    await interaction.response.send_message(f"**Stored Embeds ({len(data['stored_embeds'])} total):**\nSelect an embed to view details:", view=view, ephemeral=True)
+
+@bot.tree.command(name="spawnembed", description="Spawn a stored embed message")
+async def spawn_embed(interaction: discord.Interaction):
+    if interaction.response.is_done():
+        return
+        
+    data = load_data()
     
-    embed = discord.Embed(
-        title="📋 Stored Embeds",
-        description=embed_list,
-        color=0x0099ff
-    )
+    if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
+        await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
+        return
     
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    view = SpawnEmbedSelectView(data['stored_embeds'])
+    await interaction.response.send_message(f"**Select Embed to Spawn ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
+
+@bot.tree.command(name="delete_embed", description="Delete a stored embed message")
+async def delete_embed(interaction: discord.Interaction, embed_id: str):
+    data = load_data()
+    
+    if embed_id not in data['stored_embeds']:
+        await interaction.response.send_message(f"❌ Embed '{embed_id}' not found!", ephemeral=True)
+        return
+    
+    # Get embed title for confirmation message
+    embed_title = data['stored_embeds'][embed_id].get('title', 'Untitled')
+    
+    # Delete the embed
+    del data['stored_embeds'][embed_id]
+    save_data(data)
+    
+    await interaction.response.send_message(f"✅ Successfully deleted embed '{embed_id}' ({embed_title})", ephemeral=True)
 
 # Run the bot
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
