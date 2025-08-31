@@ -1,4 +1,3 @@
-
 {
   "ticket_counter": 1,
   "active_tickets": {},
@@ -9,7 +8,7 @@
     "admin_role_id": null,
     "category_id": null,
     "log_channel_id": null,
-    "welcome_message": "Thank you for creating a ticket! A staff member will be with you shortly."
+    "welcome_message": "Thank you for creating a ticket!"
   },
   "automod_words": [],
   "automod_enabled": true,
