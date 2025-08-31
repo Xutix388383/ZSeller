@@ -48,10 +48,33 @@ async def on_ready():
 
     # Sync slash commands
     try:
+        await bot.wait_until_ready()
         synced = await bot.tree.sync()
         print(f"✅ Synced {len(synced)} slash commands")
+        
+        # Print available guilds for debugging
+        print(f"📊 Connected to {len(bot.guilds)} guilds:")
+        for guild in bot.guilds:
+            print(f"  - {guild.name} (ID: {guild.id})")
+            
     except Exception as e:
         print(f"❌ Failed to sync commands: {e}")
+        import traceback
+        traceback.print_exc()
+
+@bot.event
+async def on_app_command_error(interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+    print(f"❌ App command error: {error}")
+    import traceback
+    traceback.print_exc()
+    
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message("❌ An error occurred while processing the command.", ephemeral=True)
+        else:
+            await interaction.followup.send("❌ An error occurred while processing the command.", ephemeral=True)
+    except:
+        pass
 
 @bot.event
 async def on_message(message):
@@ -616,10 +639,6 @@ class RIAEnrollmentView(discord.ui.View):
             await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
             return
 
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
         # Add the RIA role (ID: 1409683503100067951)
         ria_role = interaction.guild.get_role(1409683503100067951)
         if ria_role:
@@ -629,21 +648,23 @@ class RIAEnrollmentView(discord.ui.View):
                 await interaction.response.send_message("❌ I don't have permission to assign roles!", ephemeral=True)
                 return
 
-        # Send the welcome DM
+        # Create welcome embed to show to the accepted member
         welcome_embed = discord.Embed(
             title="🎉 Welcome to RIA! 🎉",
-            description="We're glad to have you! To show your loyalty and represent the crew, please make sure to:\n\n🏳️ Set your flag to PURPLE 🏳️\n\nThis helps us recognize each other in the streets. Stay active, respect the crew, and enjoy the vibes!\n\n— RIA Leadership 💜",
+            description=f"We're glad to have you! To show your loyalty and represent the crew, please make sure to:\n\n🏳️ Set your flag to PURPLE 🏳️\n\nThis helps us recognize each other in the streets. Stay active, respect the crew, and enjoy the vibes!\n\n— RIA Leadership 💜",
             color=0x800080,  # Purple color
             timestamp=datetime.now()
         )
         welcome_embed.set_footer(text="RIA Enrollment System")
 
+        # Send private message to the accepted member
         try:
             await self.selected_member.send(embed=welcome_embed)
-            dm_status = "✅ DM sent successfully"
+            dm_status = "✅ Welcome message sent via DM"
         except discord.Forbidden:
-            dm_status = "⚠️ Couldn't send DM (user has DMs disabled)"
-
+            dm_status = "⚠️ Could not send DM (user has DMs disabled)"
+        
+        # Send confirmation to the staff member
         await interaction.response.send_message(f"✅ Successfully enrolled {self.selected_member.mention} into RIA!\n{dm_status}", ephemeral=True)
 
     @discord.ui.button(label="Decline Enrollment", style=discord.ButtonStyle.danger, emoji="❌")
@@ -652,11 +673,24 @@ class RIAEnrollmentView(discord.ui.View):
             await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
             return
 
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
+        # Create decline embed to show to the declined member
+        decline_embed = discord.Embed(
+            title="❌ RIA Enrollment Declined",
+            description=f"Unfortunately your enrollment into RIA has been declined at this time. You may reapply in the future.\n\nIf you have questions, please contact RIA leadership.\n\n— RIA Leadership",
+            color=0xff0000,  # Red color
+            timestamp=datetime.now()
+        )
+        decline_embed.set_footer(text="RIA Enrollment System")
 
-        await interaction.response.send_message(f"❌ Declined enrollment for {self.selected_member.mention}.", ephemeral=True)
+        # Send private message to the declined member
+        try:
+            await self.selected_member.send(embed=decline_embed)
+            dm_status = "✅ Decline message sent via DM"
+        except discord.Forbidden:
+            dm_status = "⚠️ Could not send DM (user has DMs disabled)"
+        
+        # Send confirmation to the staff member
+        await interaction.response.send_message(f"❌ Declined enrollment for {self.selected_member.mention}.\n{dm_status}", ephemeral=True)
 
     @discord.ui.button(label="Accept into Staff Team", style=discord.ButtonStyle.success, emoji="👔")
     async def accept_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -664,16 +698,29 @@ class RIAEnrollmentView(discord.ui.View):
             await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
             return
 
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
         # Add the Staff role (ID: 1409695735829626942)
         staff_role = interaction.guild.get_role(1409695735829626942)
         if staff_role:
             try:
                 await self.selected_member.add_roles(staff_role)
-                await interaction.response.send_message(f"✅ Successfully added {self.selected_member.mention} to the Staff Team!", ephemeral=True)
+                
+                # Create staff welcome embed
+                staff_embed = discord.Embed(
+                    title="🎉 Welcome to the RIA Staff Team! 🎉",
+                    description=f"Congratulations! You've been accepted into the RIA Staff Team. You now have additional responsibilities and privileges.\n\nPlease review the staff guidelines and contact leadership if you have any questions.\n\n— RIA Leadership 💜",
+                    color=0x800080,
+                    timestamp=datetime.now()
+                )
+                staff_embed.set_footer(text="RIA Staff System")
+                
+                # Send private message to the new staff member
+                try:
+                    await self.selected_member.send(embed=staff_embed)
+                    dm_status = "✅ Staff welcome message sent via DM"
+                except discord.Forbidden:
+                    dm_status = "⚠️ Could not send DM (user has DMs disabled)"
+                
+                await interaction.response.send_message(f"✅ Successfully added {self.selected_member.mention} to the Staff Team!\n{dm_status}", ephemeral=True)
             except discord.Forbidden:
                 await interaction.response.send_message("❌ I don't have permission to assign staff roles!", ephemeral=True)
         else:
@@ -685,10 +732,6 @@ class RIAEnrollmentView(discord.ui.View):
             await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
             return
 
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
         await interaction.response.send_message(f"❌ Denied staff access for {self.selected_member.mention}.", ephemeral=True)
 
     @discord.ui.button(label="Grant Membership Access", style=discord.ButtonStyle.primary, emoji="🎫")
@@ -697,16 +740,29 @@ class RIAEnrollmentView(discord.ui.View):
             await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
             return
 
-        if not interaction.guild:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
         # Add the Membership role (ID: 1411525587474059264)
         membership_role = interaction.guild.get_role(1411525587474059264)
         if membership_role:
             try:
                 await self.selected_member.add_roles(membership_role)
-                await interaction.response.send_message(f"✅ Successfully granted membership access to {self.selected_member.mention}!", ephemeral=True)
+                
+                # Create membership welcome embed
+                membership_embed = discord.Embed(
+                    title="🎫 RIA Membership Access Granted! 🎫",
+                    description=f"You've been granted membership access! You now have access to member-only channels and features.\n\nEnjoy your membership benefits!\n\n— RIA Leadership 💜",
+                    color=0x800080,
+                    timestamp=datetime.now()
+                )
+                membership_embed.set_footer(text="RIA Membership System")
+                
+                # Send private message to the new member
+                try:
+                    await self.selected_member.send(embed=membership_embed)
+                    dm_status = "✅ Membership message sent via DM"
+                except discord.Forbidden:
+                    dm_status = "⚠️ Could not send DM (user has DMs disabled)"
+                
+                await interaction.response.send_message(f"✅ Successfully granted membership access to {self.selected_member.mention}!\n{dm_status}", ephemeral=True)
             except discord.Forbidden:
                 await interaction.response.send_message("❌ I don't have permission to assign membership roles!", ephemeral=True)
         else:
@@ -716,33 +772,39 @@ class RIAEnrollmentView(discord.ui.View):
 @bot.tree.command(name="create_embed", description="Create a custom embed message")
 async def create_embed(interaction: discord.Interaction):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
         modal = EmbedModal()
         await interaction.response.send_modal(modal)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
+    except discord.NotFound as e:
+        print(f"NotFound error in create_embed: {e}")
+        return
+    except discord.HTTPException as e:
+        if e.code == 10062:  # Unknown interaction
+            print(f"Unknown interaction in create_embed - likely expired")
+            return
+        else:
+            print(f"HTTP Error in create_embed: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+            except:
+                pass
     except Exception as e:
         print(f"Error in create_embed: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
 @bot.tree.command(name="edit_embed", description="Edit an existing embed")
 async def edit_embed(interaction: discord.Interaction):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        # Simplified guild check - just check if guild_id exists
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
@@ -754,24 +816,30 @@ async def edit_embed(interaction: discord.Interaction):
 
         view = EditEmbedSelectView(data['stored_embeds'])
         await interaction.response.send_message(f"**Select Embed to Edit ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
+    except discord.NotFound as e:
+        print(f"NotFound error in edit_embed: {e}")
+    except discord.HTTPException as e:
+        if e.code == 10062:  # Unknown interaction
+            print(f"Unknown interaction in edit_embed - likely expired")
+        else:
+            print(f"HTTP Error in edit_embed: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+            except:
+                pass
     except Exception as e:
         print(f"Error in edit_embed: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
 @bot.tree.command(name="list_embeds", description="List all stored embeds")
 async def list_embeds(interaction: discord.Interaction):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
@@ -804,24 +872,30 @@ async def list_embeds(interaction: discord.Interaction):
 
         view = EmbedSelectView(data['stored_embeds'])
         await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
+    except discord.NotFound as e:
+        print(f"NotFound error in list_embeds: {e}")
+    except discord.HTTPException as e:
+        if e.code == 10062:  # Unknown interaction
+            print(f"Unknown interaction in list_embeds - likely expired")
+        else:
+            print(f"HTTP Error in list_embeds: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+            except:
+                pass
     except Exception as e:
         print(f"Error in list_embeds: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
 @bot.tree.command(name="spawnembed", description="Spawn a stored embed message")
 async def spawn_embed(interaction: discord.Interaction):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
@@ -833,19 +907,20 @@ async def spawn_embed(interaction: discord.Interaction):
 
         view = SpawnEmbedSelectView(data['stored_embeds'])
         await interaction.response.send_message(f"**Select Embed to Spawn ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore
-        pass
     except Exception as e:
         print(f"Error in spawn_embed: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
 
 @bot.tree.command(name="delete_embed", description="Delete a stored embed message")
 async def delete_embed(interaction: discord.Interaction, embed_id: str):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
@@ -863,11 +938,10 @@ async def delete_embed(interaction: discord.Interaction, embed_id: str):
         save_data(data)
 
         await interaction.response.send_message(f"✅ Successfully deleted embed '{embed_id}' ({embed_title})", ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
     except Exception as e:
         print(f"Error in delete_embed: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
@@ -877,10 +951,7 @@ async def delete_embed(interaction: discord.Interaction, embed_id: str):
 @bot.tree.command(name="automod", description="Manage auto-moderation settings")
 async def automod(interaction: discord.Interaction, action: str, word: str = None):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
@@ -928,11 +999,10 @@ async def automod(interaction: discord.Interaction, action: str, word: str = Non
 
         else:
             await interaction.response.send_message("❌ Invalid action! Use: add, remove, list, or toggle", ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
     except Exception as e:
         print(f"Error in automod: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
@@ -942,10 +1012,7 @@ async def automod(interaction: discord.Interaction, action: str, word: str = Non
 @bot.tree.command(name="riaenroller", description="Enroll members into RIA with dropdown selection")
 async def ria_enroller(interaction: discord.Interaction):
     try:
-        if interaction.response.is_done():
-            return
-
-        if not interaction.guild:
+        if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
@@ -974,14 +1041,25 @@ async def ria_enroller(interaction: discord.Interaction):
         view = RIAEnrollmentView(members)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
+    except discord.NotFound as e:
+        print(f"NotFound error in ria_enroller: {e}")
+        return
+    except discord.HTTPException as e:
+        if e.code == 10062:  # Unknown interaction
+            print(f"Unknown interaction in ria_enroller - likely expired")
+            return
+        else:
+            print(f"HTTP Error in ria_enroller: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+            except:
+                pass
     except Exception as e:
         print(f"Error in ria_enroller: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
