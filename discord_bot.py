@@ -590,183 +590,58 @@ class EditEmbedSelectView(discord.ui.View):
         modal = EmbedModal(embed_data, embed_id)
         await interaction.response.send_modal(modal)
 
-# RIA Enrollment System
+# RIA Enrollment System - Command-based approach
 
-class RIAEnrollmentView(discord.ui.View):
-    def __init__(self, members):
-        super().__init__(timeout=300)
-        self.members = members
-        self.selected_member = None
-
-        # Create select menu options for members
-        options = []
-        for member in members[:25]:  # Discord limit of 25 options
-            options.append(discord.SelectOption(
-                label=f"{member.display_name}",
-                value=str(member.id),
-                description=f"@{member.name}"
-            ))
-
-        if options:
-            self.select_member.options = options
-        else:
-            self.select_member.disabled = True
-
-    @discord.ui.select(placeholder="Choose a member to enroll...")
-    async def select_member(self, interaction: discord.Interaction, select: discord.ui.Select):
-        member_id = int(select.values[0])
-        self.selected_member = interaction.guild.get_member(member_id)
-
-        if not self.selected_member:
-            await interaction.response.send_message("❌ Member not found!", ephemeral=True)
-            return
-
+async def send_welcome_dm(member, role_type):
+    """Send welcome DM to member based on role type"""
+    if role_type == "ria":
         embed = discord.Embed(
-            title="🏳️ RIA Enrollment Panel",
-            description=f"Selected Member: {self.selected_member.mention}\n\nChoose an action below:",
+            title="🎉 Welcome to RIA! 🎉",
+            description=f"We're glad to have you! To show your loyalty and represent the crew, please make sure to:\n\n🏳️ Set your flag to PURPLE 🏳️\n\nThis helps us recognize each other in the streets. Stay active, respect the crew, and enjoy the vibes!\n\n— RIA Leadership 💜",
             color=0x800080,
             timestamp=datetime.now()
         )
-
-        embed.add_field(name="Member", value=f"{self.selected_member.display_name}\n@{self.selected_member.name}", inline=True)
-        embed.add_field(name="Status", value="Ready for enrollment", inline=True)
-
-        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
-
-    @discord.ui.button(label="Accept into RIA", style=discord.ButtonStyle.success, emoji="✅")
-    async def accept_member(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_member:
-            await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
-            return
-
-        # Add the RIA role (ID: 1409683503100067951)
-        ria_role = interaction.guild.get_role(1409683503100067951)
-        if ria_role:
-            try:
-                await self.selected_member.add_roles(ria_role)
-            except discord.Forbidden:
-                await interaction.response.send_message("❌ I don't have permission to assign roles!", ephemeral=True)
-                return
-
-        # Create welcome embed to show to the accepted member
-        welcome_embed = discord.Embed(
-            title="🎉 Welcome to RIA! 🎉",
-            description=f"We're glad to have you! To show your loyalty and represent the crew, please make sure to:\n\n🏳️ Set your flag to PURPLE 🏳️\n\nThis helps us recognize each other in the streets. Stay active, respect the crew, and enjoy the vibes!\n\n— RIA Leadership 💜",
-            color=0x800080,  # Purple color
+        embed.set_footer(text="RIA Enrollment System")
+    elif role_type == "staff":
+        embed = discord.Embed(
+            title="🎉 Welcome to the RIA Staff Team! 🎉",
+            description=f"Congratulations! You've been accepted into the RIA Staff Team. You now have additional responsibilities and privileges.\n\nPlease review the staff guidelines and contact leadership if you have any questions.\n\n— RIA Leadership 💜",
+            color=0x800080,
             timestamp=datetime.now()
         )
-        welcome_embed.set_footer(text="RIA Enrollment System")
-
-        # Send private message to the accepted member
-        try:
-            await self.selected_member.send(embed=welcome_embed)
-            dm_status = "✅ Welcome message sent via DM"
-        except discord.Forbidden:
-            dm_status = "⚠️ Could not send DM (user has DMs disabled)"
-        
-        # Send confirmation to the staff member
-        await interaction.response.send_message(f"✅ Successfully enrolled {self.selected_member.mention} into RIA!\n{dm_status}", ephemeral=True)
-
-    @discord.ui.button(label="Decline Enrollment", style=discord.ButtonStyle.danger, emoji="❌")
-    async def decline_member(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_member:
-            await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
-            return
-
-        # Create decline embed to show to the declined member
-        decline_embed = discord.Embed(
-            title="❌ RIA Enrollment Declined",
-            description=f"Unfortunately your enrollment into RIA has been declined at this time. You may reapply in the future.\n\nIf you have questions, please contact RIA leadership.\n\n— RIA Leadership",
-            color=0xff0000,  # Red color
+        embed.set_footer(text="RIA Staff System")
+    elif role_type == "membership":
+        embed = discord.Embed(
+            title="🎫 RIA Membership Access Granted! 🎫",
+            description=f"You've been granted membership access! You now have access to member-only channels and features.\n\nEnjoy your membership benefits!\n\n— RIA Leadership 💜",
+            color=0x800080,
             timestamp=datetime.now()
         )
-        decline_embed.set_footer(text="RIA Enrollment System")
+        embed.set_footer(text="RIA Membership System")
+    else:
+        return "❌ Unknown role type"
 
-        # Send private message to the declined member
-        try:
-            await self.selected_member.send(embed=decline_embed)
-            dm_status = "✅ Decline message sent via DM"
-        except discord.Forbidden:
-            dm_status = "⚠️ Could not send DM (user has DMs disabled)"
-        
-        # Send confirmation to the staff member
-        await interaction.response.send_message(f"❌ Declined enrollment for {self.selected_member.mention}.\n{dm_status}", ephemeral=True)
+    try:
+        await member.send(embed=embed)
+        return "✅ Welcome message sent via DM"
+    except discord.Forbidden:
+        return "⚠️ Could not send DM (user has DMs disabled)"
 
-    @discord.ui.button(label="Accept into Staff Team", style=discord.ButtonStyle.success, emoji="👔")
-    async def accept_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_member:
-            await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
-            return
-
-        # Add the Staff role (ID: 1409695735829626942)
-        staff_role = interaction.guild.get_role(1409695735829626942)
-        if staff_role:
-            try:
-                await self.selected_member.add_roles(staff_role)
-                
-                # Create staff welcome embed
-                staff_embed = discord.Embed(
-                    title="🎉 Welcome to the RIA Staff Team! 🎉",
-                    description=f"Congratulations! You've been accepted into the RIA Staff Team. You now have additional responsibilities and privileges.\n\nPlease review the staff guidelines and contact leadership if you have any questions.\n\n— RIA Leadership 💜",
-                    color=0x800080,
-                    timestamp=datetime.now()
-                )
-                staff_embed.set_footer(text="RIA Staff System")
-                
-                # Send private message to the new staff member
-                try:
-                    await self.selected_member.send(embed=staff_embed)
-                    dm_status = "✅ Staff welcome message sent via DM"
-                except discord.Forbidden:
-                    dm_status = "⚠️ Could not send DM (user has DMs disabled)"
-                
-                await interaction.response.send_message(f"✅ Successfully added {self.selected_member.mention} to the Staff Team!\n{dm_status}", ephemeral=True)
-            except discord.Forbidden:
-                await interaction.response.send_message("❌ I don't have permission to assign staff roles!", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Staff role not found!", ephemeral=True)
-
-    @discord.ui.button(label="Deny Staff Access", style=discord.ButtonStyle.danger, emoji="🚫")
-    async def deny_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_member:
-            await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
-            return
-
-        await interaction.response.send_message(f"❌ Denied staff access for {self.selected_member.mention}.", ephemeral=True)
-
-    @discord.ui.button(label="Grant Membership Access", style=discord.ButtonStyle.primary, emoji="🎫")
-    async def grant_membership(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_member:
-            await interaction.response.send_message("❌ Please select a member first!", ephemeral=True)
-            return
-
-        # Add the Membership role (ID: 1411525587474059264)
-        membership_role = interaction.guild.get_role(1411525587474059264)
-        if membership_role:
-            try:
-                await self.selected_member.add_roles(membership_role)
-                
-                # Create membership welcome embed
-                membership_embed = discord.Embed(
-                    title="🎫 RIA Membership Access Granted! 🎫",
-                    description=f"You've been granted membership access! You now have access to member-only channels and features.\n\nEnjoy your membership benefits!\n\n— RIA Leadership 💜",
-                    color=0x800080,
-                    timestamp=datetime.now()
-                )
-                membership_embed.set_footer(text="RIA Membership System")
-                
-                # Send private message to the new member
-                try:
-                    await self.selected_member.send(embed=membership_embed)
-                    dm_status = "✅ Membership message sent via DM"
-                except discord.Forbidden:
-                    dm_status = "⚠️ Could not send DM (user has DMs disabled)"
-                
-                await interaction.response.send_message(f"✅ Successfully granted membership access to {self.selected_member.mention}!\n{dm_status}", ephemeral=True)
-            except discord.Forbidden:
-                await interaction.response.send_message("❌ I don't have permission to assign membership roles!", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Membership role not found!", ephemeral=True)
+async def send_decline_dm(member):
+    """Send decline DM to member"""
+    embed = discord.Embed(
+        title="❌ RIA Enrollment Declined",
+        description=f"Unfortunately your enrollment into RIA has been declined at this time. You may reapply in the future.\n\nIf you have questions, please contact RIA leadership.\n\n— RIA Leadership",
+        color=0xff0000,
+        timestamp=datetime.now()
+    )
+    embed.set_footer(text="RIA Enrollment System")
+    
+    try:
+        await member.send(embed=embed)
+        return "✅ Decline message sent via DM"
+    except discord.Forbidden:
+        return "⚠️ Could not send DM (user has DMs disabled)"
 
 # Slash Commands
 @bot.tree.command(name="create_embed", description="Create a custom embed message")
@@ -1009,57 +884,206 @@ async def automod(interaction: discord.Interaction, action: str, word: str = Non
         except:
             pass
 
-@bot.tree.command(name="riaenroller", description="Enroll members into RIA with dropdown selection")
-async def ria_enroller(interaction: discord.Interaction):
+@bot.tree.command(name="ria_accept", description="Accept a member into RIA or show members without RIA role")
+async def ria_accept(interaction: discord.Interaction, member: discord.Member = None):
+    """Accept a member into RIA or show all members without RIA role"""
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Get all non-bot members from the server
-        members = [member for member in interaction.guild.members if not member.bot]
-
-        if not members:
-            await interaction.response.send_message("❌ No members found in this server!", ephemeral=True)
+        # Get the RIA role (ID: 1409683503100067951)
+        ria_role = interaction.guild.get_role(1409683503100067951)
+        if not ria_role:
+            await interaction.response.send_message("❌ RIA role not found!", ephemeral=True)
             return
 
-        embed = discord.Embed(
-            title="🏳️ RIA Enrollment System",
-            description=f"Select a member from the dropdown below to enroll them into RIA.\n\n**Available members:** {len(members)}",
-            color=0x800080,
-            timestamp=datetime.now()
-        )
+        # If no member specified, show all members without RIA role
+        if member is None:
+            members_without_ria = []
+            for guild_member in interaction.guild.members:
+                if not guild_member.bot and ria_role not in guild_member.roles:
+                    members_without_ria.append(guild_member)
 
-        embed.add_field(
-            name="📋 Instructions",
-            value="1. Select a member from the dropdown\n2. Choose to accept or decline their enrollment\n3. If accepted, they'll receive the RIA role and welcome message",
-            inline=False
-        )
+            if not members_without_ria:
+                await interaction.response.send_message("✅ All members already have the RIA role!", ephemeral=True)
+                return
 
-        embed.set_footer(text="RIA Enrollment System")
+            # Create embed showing members without RIA role
+            embed = discord.Embed(
+                title="👥 Members Without RIA Role",
+                description=f"Found **{len(members_without_ria)}** members without the RIA role:",
+                color=0xff9900
+            )
 
-        view = RIAEnrollmentView(members)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            # Split members into chunks for fields (Discord has field limits)
+            chunk_size = 10
+            for i in range(0, len(members_without_ria), chunk_size):
+                chunk = members_without_ria[i:i+chunk_size]
+                member_list = "\n".join([f"• {member.mention} ({member.display_name})" for member in chunk])
+                
+                field_name = f"Members {i+1}-{min(i+chunk_size, len(members_without_ria))}"
+                embed.add_field(name=field_name, value=member_list, inline=False)
 
-    except discord.NotFound as e:
-        print(f"NotFound error in ria_enroller: {e}")
-        return
-    except discord.HTTPException as e:
-        if e.code == 10062:  # Unknown interaction
-            print(f"Unknown interaction in ria_enroller - likely expired")
+            embed.set_footer(text="Use /ria_accept @member to accept a specific member")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        else:
-            print(f"HTTP Error in ria_enroller: {e}")
-            try:
-                if not interaction.response.is_done():
-                    await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-            except:
-                pass
+
+        # If member specified, accept them into RIA
+        if ria_role in member.roles:
+            await interaction.response.send_message(f"❌ {member.mention} already has the RIA role!", ephemeral=True)
+            return
+
+        try:
+            await member.add_roles(ria_role)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ I don't have permission to assign roles!", ephemeral=True)
+            return
+
+        # Send welcome DM
+        dm_status = await send_welcome_dm(member, "ria")
+        
+        await interaction.response.send_message(f"✅ Successfully enrolled {member.mention} into RIA!\n{dm_status}", ephemeral=True)
+
     except Exception as e:
-        print(f"Error in ria_enroller: {e}")
+        print(f"Error in ria_accept: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="ria_decline", description="Decline a member's RIA enrollment")
+async def ria_decline(interaction: discord.Interaction, member: discord.Member):
+    """Decline a member's RIA enrollment"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Send decline DM
+        dm_status = await send_decline_dm(member)
+        
+        await interaction.response.send_message(f"❌ Declined enrollment for {member.mention}.\n{dm_status}", ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in ria_decline: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="ria_staff", description="Add a member to RIA Staff Team")
+async def ria_staff(interaction: discord.Interaction, member: discord.Member):
+    """Add a member to RIA Staff Team"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Add the Staff role (ID: 1409695735829626942)
+        staff_role = interaction.guild.get_role(1409695735829626942)
+        if not staff_role:
+            await interaction.response.send_message("❌ Staff role not found!", ephemeral=True)
+            return
+
+        try:
+            await member.add_roles(staff_role)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ I don't have permission to assign staff roles!", ephemeral=True)
+            return
+
+        # Send staff welcome DM
+        dm_status = await send_welcome_dm(member, "staff")
+        
+        await interaction.response.send_message(f"✅ Successfully added {member.mention} to the Staff Team!\n{dm_status}", ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in ria_staff: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="ria_membership", description="Grant membership access to a member")
+async def ria_membership(interaction: discord.Interaction, member: discord.Member):
+    """Grant membership access to a member"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Add the Membership role (ID: 1411525587474059264)
+        membership_role = interaction.guild.get_role(1411525587474059264)
+        if not membership_role:
+            await interaction.response.send_message("❌ Membership role not found!", ephemeral=True)
+            return
+
+        try:
+            await member.add_roles(membership_role)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ I don't have permission to assign membership roles!", ephemeral=True)
+            return
+
+        # Send membership welcome DM
+        dm_status = await send_welcome_dm(member, "membership")
+        
+        await interaction.response.send_message(f"✅ Successfully granted membership access to {member.mention}!\n{dm_status}", ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in ria_membership: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="ria_remove", description="Remove RIA roles from a member")
+async def ria_remove(interaction: discord.Interaction, member: discord.Member, role_type: str):
+    """Remove RIA roles from a member"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        role_id = None
+        role_name = ""
+        
+        if role_type.lower() == "ria":
+            role_id = 1409683503100067951
+            role_name = "RIA"
+        elif role_type.lower() == "staff":
+            role_id = 1409695735829626942
+            role_name = "Staff"
+        elif role_type.lower() == "membership":
+            role_id = 1411525587474059264
+            role_name = "Membership"
+        else:
+            await interaction.response.send_message("❌ Invalid role type! Use: ria, staff, or membership", ephemeral=True)
+            return
+
+        role = interaction.guild.get_role(role_id)
+        if not role:
+            await interaction.response.send_message(f"❌ {role_name} role not found!", ephemeral=True)
+            return
+
+        if role not in member.roles:
+            await interaction.response.send_message(f"❌ {member.mention} doesn't have the {role_name} role!", ephemeral=True)
+            return
+
+        try:
+            await member.remove_roles(role)
+            await interaction.response.send_message(f"✅ Successfully removed {role_name} role from {member.mention}!", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ I don't have permission to remove roles!", ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in ria_remove: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
         except:
             pass
 
