@@ -1,6 +1,17 @@
+
 {
   "ticket_counter": 1,
   "active_tickets": {},
   "stored_embeds": {},
-  "embed_counter": 1
+  "embed_counter": 1,
+  "ticket_settings": {
+    "support_role_id": null,
+    "admin_role_id": null,
+    "category_id": null,
+    "log_channel_id": null,
+    "welcome_message": "Thank you for creating a ticket! A staff member will be with you shortly."
+  },
+  "automod_words": [],
+  "automod_enabled": true,
+  "scheduled_announcements": {}
 }
