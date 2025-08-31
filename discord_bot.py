@@ -222,10 +222,23 @@ class EmbedOptionsView(discord.ui.View):
         self.embed_data = embed_data
         self.editing_embed_id = editing_embed_id
 
-    @discord.ui.button(label="Add Field", style=discord.ButtonStyle.primary, emoji="📝")
-    async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = FieldModal(self.embed_data)
-        await interaction.response.send_modal(modal)
+        # Ensure buttons list exists
+        if 'buttons' not in self.embed_data:
+            self.embed_data['buttons'] = []
+
+    @discord.ui.button(label="Create Button", style=discord.ButtonStyle.primary, emoji="🔘")
+    async def create_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if len(self.embed_data.get('buttons', [])) >= 5:
+            await interaction.response.send_message("❌ Maximum of 5 buttons allowed per embed!", ephemeral=True)
+            return
+        
+        try:
+            modal = ButtonModal(self.embed_data)
+            await interaction.response.send_modal(modal)
+        except discord.InteractionResponded:
+            # If interaction was already responded to, try followup
+            modal = ButtonModal(self.embed_data)
+            await interaction.followup.send("Opening button creation modal...", ephemeral=True)
 
     @discord.ui.button(label="Manage Fields", style=discord.ButtonStyle.secondary, emoji="📋")
     async def manage_fields(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -247,10 +260,26 @@ class EmbedOptionsView(discord.ui.View):
         modal = AuthorModal(self.embed_data)
         await interaction.response.send_modal(modal)
 
+    @discord.ui.button(label="Add Field", style=discord.ButtonStyle.secondary, emoji="📝")
+    async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = FieldModal(self.embed_data)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Manage Buttons", style=discord.ButtonStyle.secondary, emoji="🎛️")
+    async def manage_buttons(self, interaction: discord.Interaction, button: discord.ui.Button):
+        buttons = self.embed_data.get('buttons', [])
+        if not buttons:
+            await interaction.response.send_message("No buttons to manage! Add a button first.", ephemeral=True)
+            return
+
+        view = ButtonManagerView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message("**Button Manager:**\nSelect a button to edit or delete:", view=view, ephemeral=True)
+
     @discord.ui.button(label="Preview", style=discord.ButtonStyle.secondary, emoji="👁️")
     async def preview_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = create_embed_from_data(self.embed_data)
-        await interaction.response.send_message("**Preview:**", embed=embed, ephemeral=True)
+        view = create_embed_button_view(self.embed_data) if self.embed_data.get('buttons') else None
+        await interaction.response.send_message("**Preview:**", embed=embed, view=view, ephemeral=True)
 
     @discord.ui.button(label="Save Changes", style=discord.ButtonStyle.primary, emoji="💾")
     async def save_changes(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -298,7 +327,10 @@ class EmbedOptionsView(discord.ui.View):
         save_data(data)
 
         await interaction.response.send_message(f"Embed {action_text}! (ID: {embed_id})", ephemeral=True)
-        await interaction.followup.send(embed=embed)
+        
+        # Create button view if buttons exist
+        button_view = create_embed_button_view(self.embed_data) if self.embed_data.get('buttons') else None
+        await interaction.followup.send(embed=embed, view=button_view)
 
 class ImageModal(discord.ui.Modal, title="Add Image"):
     def __init__(self, embed_data):
@@ -350,6 +382,254 @@ class AuthorModal(discord.ui.Modal, title="Add Author"):
         view = EmbedOptionsView(self.embed_data)
         await interaction.response.send_message("Author added! Continue editing:", view=view, ephemeral=True)
 
+class ButtonModal(discord.ui.Modal, title="Add Button"):
+    def __init__(self, embed_data, button_index=None):
+        super().__init__()
+        self.embed_data = embed_data
+        self.button_index = button_index
+
+        if button_index is not None and button_index < len(embed_data.get('buttons', [])):
+            button = embed_data['buttons'][button_index]
+            self.label_input.default = button.get('label', '')
+            self.emoji_input.default = button.get('emoji', '')
+            self.style_input.default = button.get('style', 'primary')
+
+    label_input = discord.ui.TextInput(
+        label="Button Label",
+        placeholder="Enter button text...",
+        max_length=80,
+        required=True
+    )
+
+    emoji_input = discord.ui.TextInput(
+        label="Button Emoji (optional)",
+        placeholder="Enter emoji (e.g., 🛒, 💰, ✅)",
+        max_length=10,
+        required=False
+    )
+
+    style_input = discord.ui.TextInput(
+        label="Button Style",
+        placeholder="primary, secondary, success, danger",
+        max_length=20,
+        required=False,
+        default="primary"
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Validate style
+        valid_styles = ['primary', 'secondary', 'success', 'danger']
+        style = self.style_input.value.lower() if self.style_input.value else 'primary'
+        if style not in valid_styles:
+            style = 'primary'
+
+        button_data = {
+            'label': str(self.label_input.value),
+            'emoji': str(self.emoji_input.value) if self.emoji_input.value else None,
+            'style': style,
+            'action': None  # Will be set in the next step
+        }
+
+        if 'buttons' not in self.embed_data:
+            self.embed_data['buttons'] = []
+
+        if self.button_index is not None:
+            # Keep existing action when editing
+            if self.button_index < len(self.embed_data['buttons']):
+                button_data['action'] = self.embed_data['buttons'][self.button_index].get('action')
+            self.embed_data['buttons'][self.button_index] = button_data
+        else:
+            self.embed_data['buttons'].append(button_data)
+
+        # Show action selection
+        view = ButtonActionView(self.embed_data, self.button_index or (len(self.embed_data['buttons']) - 1))
+        try:
+            await interaction.response.send_message("Button created! Now choose what this button should do:", view=view, ephemeral=True)
+        except discord.InteractionResponded:
+            await interaction.followup.send("Button created! Now choose what this button should do:", view=view, ephemeral=True)
+
+class ButtonActionView(discord.ui.View):
+    def __init__(self, embed_data, button_index):
+        super().__init__(timeout=300)
+        self.embed_data = embed_data
+        self.button_index = button_index
+
+    @discord.ui.select(
+        placeholder="Choose what this button should do...",
+        options=[
+            discord.SelectOption(label="Send Message", value="send_message", description="Send a message to the channel", emoji="💬"),
+            discord.SelectOption(label="Give Role", value="give_role", description="Give a role to the user", emoji="🎭"),
+            discord.SelectOption(label="Remove Role", value="remove_role", description="Remove a role from the user", emoji="🗑️"),
+            discord.SelectOption(label="Send DM", value="send_dm", description="Send a direct message to the user", emoji="📩"),
+            discord.SelectOption(label="Custom Response", value="custom_response", description="Send a custom response message", emoji="📝"),
+            discord.SelectOption(label="Shop Item", value="shop_item", description="Virtual shop item purchase", emoji="🛒"),
+        ]
+    )
+    async def select_action(self, interaction: discord.Interaction, select: discord.ui.Select):
+        action_type = select.values[0]
+        
+        if action_type == "send_message":
+            modal = ActionConfigModal(self.embed_data, self.button_index, "send_message", "Configure Message")
+        elif action_type == "give_role":
+            modal = ActionConfigModal(self.embed_data, self.button_index, "give_role", "Configure Role to Give")
+        elif action_type == "remove_role":
+            modal = ActionConfigModal(self.embed_data, self.button_index, "remove_role", "Configure Role to Remove")
+        elif action_type == "send_dm":
+            modal = ActionConfigModal(self.embed_data, self.button_index, "send_dm", "Configure DM Message")
+        elif action_type == "custom_response":
+            modal = ActionConfigModal(self.embed_data, self.button_index, "custom_response", "Configure Response")
+        elif action_type == "shop_item":
+            modal = ActionConfigModal(self.embed_data, self.button_index, "shop_item", "Configure Shop Item")
+        
+        await interaction.response.send_modal(modal)
+
+class ActionConfigModal(discord.ui.Modal):
+    def __init__(self, embed_data, button_index, action_type, title):
+        super().__init__(title=title)
+        self.embed_data = embed_data
+        self.button_index = button_index
+        self.action_type = action_type
+
+        # Configure fields based on action type
+        if action_type in ["send_message", "custom_response", "send_dm"]:
+            self.add_item(discord.ui.TextInput(
+                label="Message Content",
+                placeholder="Enter the message to send...",
+                style=discord.TextStyle.paragraph,
+                max_length=2000,
+                required=True
+            ))
+        elif action_type in ["give_role", "remove_role"]:
+            self.add_item(discord.ui.TextInput(
+                label="Role ID",
+                placeholder="Enter the role ID (right-click role, copy ID)...",
+                max_length=25,
+                required=True
+            ))
+            self.add_item(discord.ui.TextInput(
+                label="Success Message",
+                placeholder="Message to send when action succeeds...",
+                max_length=200,
+                required=False,
+                default="Action completed!"
+            ))
+        elif action_type == "shop_item":
+            self.add_item(discord.ui.TextInput(
+                label="Item Name",
+                placeholder="Enter item name...",
+                max_length=100,
+                required=True
+            ))
+            self.add_item(discord.ui.TextInput(
+                label="Item Price",
+                placeholder="Enter price (for display)...",
+                max_length=50,
+                required=True
+            ))
+            self.add_item(discord.ui.TextInput(
+                label="Purchase Message",
+                placeholder="Message sent when purchased...",
+                style=discord.TextStyle.paragraph,
+                max_length=500,
+                required=True
+            ))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        action_data = {'type': self.action_type}
+        
+        if self.action_type in ["send_message", "custom_response", "send_dm"]:
+            action_data['message'] = str(self.children[0].value)
+        elif self.action_type in ["give_role", "remove_role"]:
+            action_data['role_id'] = str(self.children[0].value)
+            action_data['success_message'] = str(self.children[1].value) if self.children[1].value else "Action completed!"
+        elif self.action_type == "shop_item":
+            action_data['item_name'] = str(self.children[0].value)
+            action_data['price'] = str(self.children[1].value)
+            action_data['purchase_message'] = str(self.children[2].value)
+
+        # Update button with action
+        self.embed_data['buttons'][self.button_index]['action'] = action_data
+
+        view = EmbedOptionsView(self.embed_data)
+        await interaction.response.send_message(f"✅ Button action configured! Continue editing:", view=view, ephemeral=True)
+
+class ButtonManagerView(discord.ui.View):
+    def __init__(self, embed_data, editing_embed_id=None):
+        super().__init__(timeout=300)
+        self.embed_data = embed_data
+        self.editing_embed_id = editing_embed_id
+
+        # Create select menu for buttons
+        buttons = embed_data.get('buttons', [])
+        options = []
+        for i, button in enumerate(buttons):
+            button_label = button.get('label', f'Button {i+1}')
+            action_type = button.get('action', {}).get('type', 'No action')
+            
+            options.append(discord.SelectOption(
+                label=f"{i+1}. {button_label}"[:100],
+                value=str(i),
+                description=f"Action: {action_type}"[:100]
+            ))
+
+        if options:
+            self.select_button.options = options[:25]
+        else:
+            self.select_button.disabled = True
+
+    @discord.ui.select(placeholder="Choose a button to manage...")
+    async def select_button(self, interaction: discord.Interaction, select: discord.ui.Select):
+        button_index = int(select.values[0])
+        self.selected_button_index = button_index
+
+        button = self.embed_data['buttons'][button_index]
+        embed = discord.Embed(
+            title=f"🔘 Button {button_index + 1}",
+            color=0x0099ff
+        )
+        embed.add_field(name="Label", value=button.get('label', 'No label'), inline=False)
+        embed.add_field(name="Style", value=button.get('style', 'primary'), inline=True)
+        embed.add_field(name="Emoji", value=button.get('emoji', 'None'), inline=True)
+        
+        action = button.get('action', {})
+        action_desc = f"Type: {action.get('type', 'None')}"
+        if action.get('type') in ['send_message', 'custom_response', 'send_dm']:
+            action_desc += f"\nMessage: {action.get('message', 'N/A')[:100]}"
+        elif action.get('type') in ['give_role', 'remove_role']:
+            action_desc += f"\nRole ID: {action.get('role_id', 'N/A')}"
+        elif action.get('type') == 'shop_item':
+            action_desc += f"\nItem: {action.get('item_name', 'N/A')} - {action.get('price', 'N/A')}"
+        
+        embed.add_field(name="Action", value=action_desc, inline=False)
+
+        await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
+
+    @discord.ui.button(label="Edit Selected Button", style=discord.ButtonStyle.primary, emoji="✏️")
+    async def edit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not hasattr(self, 'selected_button_index'):
+            await interaction.response.send_message("❌ Please select a button first!", ephemeral=True)
+            return
+
+        modal = ButtonModal(self.embed_data, self.selected_button_index)
+        await interaction.response.send_modal(modal)
+
+    @discord.ui.button(label="Delete Selected Button", style=discord.ButtonStyle.danger, emoji="🗑️")
+    async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not hasattr(self, 'selected_button_index'):
+            await interaction.response.send_message("❌ Please select a button first!", ephemeral=True)
+            return
+
+        button_label = self.embed_data['buttons'][self.selected_button_index].get('label', f'Button {self.selected_button_index + 1}')
+        del self.embed_data['buttons'][self.selected_button_index]
+
+        view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message(f"✅ Deleted button '{button_label}'. Continue editing:", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Back to Embed Editor", style=discord.ButtonStyle.secondary, emoji="↩️")
+    async def back_to_editor(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message("Back to embed editor:", view=view, ephemeral=True)
+
 def create_embed_from_data(embed_data):
     embed = discord.Embed()
 
@@ -392,6 +672,122 @@ def create_embed_from_data(embed_data):
             )
 
     return embed
+
+def create_embed_button_view(embed_data):
+    """Create a view with buttons for an embed"""
+    if not embed_data.get('buttons'):
+        return None
+    
+    class DynamicEmbedView(discord.ui.View):
+        def __init__(self, buttons_data):
+            super().__init__(timeout=None)
+            self.buttons_data = buttons_data
+            
+            # Add buttons dynamically
+            for i, button_data in enumerate(buttons_data):
+                style_map = {
+                    'primary': discord.ButtonStyle.primary,
+                    'secondary': discord.ButtonStyle.secondary,
+                    'success': discord.ButtonStyle.success,
+                    'danger': discord.ButtonStyle.danger
+                }
+                
+                style = style_map.get(button_data.get('style', 'primary'), discord.ButtonStyle.primary)
+                
+                # Create button
+                button = discord.ui.Button(
+                    label=button_data.get('label', f'Button {i+1}'),
+                    style=style,
+                    emoji=button_data.get('emoji'),
+                    custom_id=f"embed_button_{i}"
+                )
+                
+                # Create callback function
+                button.callback = self.create_button_callback(i, button_data.get('action', {}))
+                self.add_item(button)
+        
+        def create_button_callback(self, button_index, action_data):
+            async def button_callback(interaction):
+                await self.handle_button_action(interaction, action_data)
+            return button_callback
+        
+        async def handle_button_action(self, interaction, action_data):
+            action_type = action_data.get('type')
+            
+            try:
+                if action_type == "send_message":
+                    message = action_data.get('message', 'Button clicked!')
+                    await interaction.response.send_message(message)
+                
+                elif action_type == "custom_response":
+                    message = action_data.get('message', 'Custom response!')
+                    await interaction.response.send_message(message, ephemeral=True)
+                
+                elif action_type == "send_dm":
+                    message = action_data.get('message', 'Hello from the bot!')
+                    try:
+                        await interaction.user.send(message)
+                        await interaction.response.send_message("✅ Message sent to your DMs!", ephemeral=True)
+                    except discord.Forbidden:
+                        await interaction.response.send_message("❌ Could not send DM. Please check your privacy settings.", ephemeral=True)
+                
+                elif action_type == "give_role":
+                    role_id = int(action_data.get('role_id', 0))
+                    role = interaction.guild.get_role(role_id)
+                    if role:
+                        if role in interaction.user.roles:
+                            await interaction.response.send_message(f"❌ You already have the {role.name} role!", ephemeral=True)
+                        else:
+                            try:
+                                await interaction.user.add_roles(role)
+                                success_msg = action_data.get('success_message', f"✅ You've been given the {role.name} role!")
+                                await interaction.response.send_message(success_msg, ephemeral=True)
+                            except discord.Forbidden:
+                                await interaction.response.send_message("❌ I don't have permission to assign this role!", ephemeral=True)
+                    else:
+                        await interaction.response.send_message("❌ Role not found!", ephemeral=True)
+                
+                elif action_type == "remove_role":
+                    role_id = int(action_data.get('role_id', 0))
+                    role = interaction.guild.get_role(role_id)
+                    if role:
+                        if role not in interaction.user.roles:
+                            await interaction.response.send_message(f"❌ You don't have the {role.name} role!", ephemeral=True)
+                        else:
+                            try:
+                                await interaction.user.remove_roles(role)
+                                success_msg = action_data.get('success_message', f"✅ The {role.name} role has been removed!")
+                                await interaction.response.send_message(success_msg, ephemeral=True)
+                            except discord.Forbidden:
+                                await interaction.response.send_message("❌ I don't have permission to remove this role!", ephemeral=True)
+                    else:
+                        await interaction.response.send_message("❌ Role not found!", ephemeral=True)
+                
+                elif action_type == "shop_item":
+                    item_name = action_data.get('item_name', 'Mystery Item')
+                    price = action_data.get('price', 'Free')
+                    purchase_msg = action_data.get('purchase_message', f'You purchased {item_name} for {price}!')
+                    
+                    embed = discord.Embed(
+                        title="🛒 Purchase Successful!",
+                        description=purchase_msg,
+                        color=0x00ff00,
+                        timestamp=datetime.now()
+                    )
+                    embed.add_field(name="Item", value=item_name, inline=True)
+                    embed.add_field(name="Price", value=price, inline=True)
+                    embed.set_footer(text=f"Purchased by {interaction.user.display_name}")
+                    
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
+                
+                else:
+                    await interaction.response.send_message("🔘 Button clicked! (No action configured)", ephemeral=True)
+                    
+            except Exception as e:
+                print(f"Error in button action: {e}")
+                await interaction.response.send_message("❌ An error occurred while processing the button action.", ephemeral=True)
+    
+    return DynamicEmbedView(embed_data['buttons'])
 
 class FieldManagerView(discord.ui.View):
     def __init__(self, embed_data, editing_embed_id=None):
