@@ -14,6 +14,38 @@ intents.guilds = True
 intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# --- Dynamic Role and Category Detection Functions ---
+
+def get_staff_roles(guild):
+    """Dynamically detect staff roles based on common names and permissions."""
+    staff_roles = []
+    if not guild:
+        return staff_roles
+
+    for role in guild.roles:
+        role_name_lower = role.name.lower()
+        # Check for common staff keywords and essential permissions
+        if (any(keyword in role_name_lower for keyword in ['staff', 'admin', 'mod', 'moderator', 'helper', 'manager']) or
+                role.permissions.administrator or
+                role.permissions.manage_guild or
+                role.permissions.manage_roles):
+            staff_roles.append(role)
+    return staff_roles
+
+def get_shop_ticket_category(guild):
+    """Dynamically find or suggest a shop ticket category ID."""
+    if not guild:
+        return None
+
+    # Prioritize existing categories with specific keywords
+    for cat in guild.categories:
+        cat_name_lower = cat.name.lower()
+        if any(keyword in cat_name_lower for keyword in ['shop', 'order', 'ticket', 'support', 'transactions']):
+            return cat.id
+
+    # If no suitable category found, return None, suggesting creation or a fallback
+    return None
+
 # Enhanced channel and member detection functions
 def get_channels_by_name(guild):
     """Auto-detect channels by name patterns with enhanced matching"""
@@ -46,13 +78,13 @@ def get_channels_by_name(guild):
             continue  # Skip channels bot can't see
 
         channel_name_lower = channel.name.lower()
-        
+
         # Enhanced cleaning - remove emojis, special chars, but keep essential separators and Unicode letters
         clean_name = ''.join(c for c in channel_name_lower if c.isalnum() or c in ['-', '_', ' '] or ord(c) > 127)
-        
+
         # Also check original name for Unicode styled text like 𝐓𝐢𝐜𝐤𝐞𝐭𝐬
         original_name = channel.name
-        
+
         # Split by common separators for better word matching
         name_words = clean_name.replace('-', ' ').replace('_', ' ').split()
 
@@ -247,9 +279,12 @@ def analyze_guild_structure(guild):
 CHANNELS = {}
 GUILD_ANALYSIS = {}
 
-# Role IDs
-STAFF_ROLE_ID = 1407347171795406919  # Admin role
-OWNER_ROLE_ID = 1407347171056943214  # Owner role
+# Role IDs - These will be dynamically detected or configured if necessary
+# STAFF_ROLE_ID = 1409693493206581300  # Admin role (Example, not used directly with dynamic detection)
+# OWNER_ROLE_ID = 1409693493206581300  # Owner role (Example, not used directly with dynamic detection)
+
+# Ticket category ID for shop orders - This will be dynamically detected
+# SHOP_TICKET_CATEGORY_ID = 1407347196906573889 # (Example, not used directly with dynamic detection)
 
 # Ticket counter and data storage
 TICKET_COUNTER = 1
@@ -284,47 +319,9 @@ def save_data():
     except Exception as e:
         print(f"Error saving data: {e}")
 
-# Shop data
-WEAPONS = [
-    "GoldenButton", "GreenSwitch", "BlueTips/Switch", "OrangeButton", "BinaryTrigger",
-    "YellowButtonSwitch", "FullyARP", "FullyDraco", "Fully-MicroAR", "Cyanbutton",
-    "100RndTanG19", "300ARG", "VP9Scope", "MasterPiece30", "GSwitch",
-    "G17WittaButton", "G19Switch", "G20Switch", "G21Switch", "G22 Switch",
-    "G23 Switch", "G40 Switch", "G42 Switch", "Fully-FN", "BinaryARP",
-    "BinaryDraco", "CustomAR9"
-]
 
-WATCHES = [
-    "Cartier", "BlueFaceCartier", "White Richard Millie", "PinkRichard", "GreenRichard",
-    "RedRichard", "BluRichard", "BlackOutMillie", "Red AP", "AP Watch", "Gold AP",
-    "Red AP Watch", "CubanG AP", "CubanP AP", "CubanB AP", "Iced AP"
-]
 
-# New shop view with purchase and calculator buttons
-class NewShopView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
 
-    @discord.ui.button(label='Calculate your order then purchase', style=discord.ButtonStyle.primary, emoji='🧮', custom_id='new_shop_calculator')
-    async def calculator(self, interaction: discord.Interaction, button: discord.ui.Button):
-        calculator_view = CalculatorView()
-        embed = discord.Embed(
-            title="🛒 ZSupply Cart & Calculator",
-            description="**Add items to your cart:**\n\n🛒 **Cart Total: $0.00**",
-            color=0x00ff00
-        )
-        embed.add_field(
-            name="🛒 Your Cart:",
-            value="No items in cart yet",
-            inline=False
-        )
-        embed.add_field(
-            name="📝 How It Works:",
-            value="1️⃣ Add items to your cart using buttons below\n2️⃣ Click 'Purchase Cart' when ready\n3️⃣ Your cart items will be sent in your ticket",
-            inline=False
-        )
-        embed.set_footer(text="Add items to cart, then click Purchase Cart to order!")
-        await interaction.response.send_message(embed=embed, view=calculator_view, ephemeral=True)
 
 # Cart purchase modal for calculator orders
 class CartPurchaseModal(discord.ui.Modal, title='Purchase Cart Items'):
@@ -347,16 +344,45 @@ class CartPurchaseModal(discord.ui.Modal, title='Purchase Cart Items'):
         ticket_number = TICKET_COUNTER
         TICKET_COUNTER += 1
 
-        # Create private ticket in specified channel
-        PRIVATE_TICKET_CHANNEL_ID = 1408167680317325434
-        ticket_channel = interaction.guild.get_channel(PRIVATE_TICKET_CHANNEL_ID)
+        # Create ticket channel in the shop category (auto-detected)
+        guild = interaction.guild
+        category_id = get_shop_ticket_category(guild)
+        category = None
 
-        # Check if it's a category channel and get the first text channel from it
-        if ticket_channel and hasattr(ticket_channel, 'text_channels') and ticket_channel.text_channels:
-            ticket_channel = ticket_channel.text_channels[0]
-        elif not ticket_channel or not hasattr(ticket_channel, 'send'):
-            await interaction.response.send_message("❌ Private ticket channel not found or invalid! Please contact an administrator.", ephemeral=True)
-            return
+        if category_id:
+            category = guild.get_channel(category_id)
+
+        if not category:
+            # Try to find any category with shop/ticket keywords - do not create new ones
+            for cat in guild.categories:
+                if any(keyword in cat.name.lower() for keyword in ['shop', 'ticket', 'order', 'support']):
+                    category = cat
+                    break
+
+            if not category:
+                # Use the hardcoded category ID: 1409942998615199764
+                category = guild.get_channel(1409942998615199764)
+                if not category:
+                    await interaction.response.send_message("❌ Shop category not found! Please contact an administrator.", ephemeral=True)
+                    return
+
+        # Create ticket channel with proper permissions
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        }
+
+        # Add staff permissions dynamically
+        staff_roles = get_staff_roles(guild)
+        for staff_role in staff_roles:
+            overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+        ticket_channel = await guild.create_text_channel(
+            f"order-{ticket_number:04d}-{interaction.user.display_name}",
+            category=category,
+            overwrites=overwrites
+        )
 
         # Store ticket data
         ticket_id = f"cart_{ticket_number:04d}_{interaction.user.id}"
@@ -405,7 +431,7 @@ class CartPurchaseModal(discord.ui.Modal, title='Purchase Cart Items'):
             inline=False
         )
 
-        embed.set_footer(text="ZSupply Cart Order System • Staff will assist you")
+        embed.set_footer(text="RIA Gang Cart Order System • Staff will assist you")
 
         # Create control view for staff
         view = PrivateTicketControlView(ticket_id)
@@ -445,16 +471,45 @@ class NewPurchaseModal(discord.ui.Modal, title='Create Purchase Order'):
         ticket_number = TICKET_COUNTER
         TICKET_COUNTER += 1
 
-        # Create private ticket in specified channel
-        PRIVATE_TICKET_CHANNEL_ID = 1408167680317325434
-        ticket_channel = interaction.guild.get_channel(PRIVATE_TICKET_CHANNEL_ID)
+        # Create ticket channel in the shop category (auto-detected)
+        guild = interaction.guild
+        category_id = get_shop_ticket_category(guild)
+        category = None
 
-        # Check if it's a category channel and get the first text channel from it
-        if ticket_channel and hasattr(ticket_channel, 'text_channels') and ticket_channel.text_channels:
-            ticket_channel = ticket_channel.text_channels[0]
-        elif not ticket_channel or not hasattr(ticket_channel, 'send'):
-            await interaction.response.send_message("❌ Private ticket channel not found or invalid! Please contact an administrator.", ephemeral=True)
-            return
+        if category_id:
+            category = guild.get_channel(category_id)
+
+        if not category:
+            # Try to find any category with shop/ticket keywords - do not create new ones
+            for cat in guild.categories:
+                if any(keyword in cat.name.lower() for keyword in ['shop', 'ticket', 'order', 'support']):
+                    category = cat
+                    break
+
+            if not category:
+                # Use the hardcoded category ID: 1409942998615199764
+                category = guild.get_channel(1409942998615199764)
+                if not category:
+                    await interaction.response.send_message("❌ Shop category not found! Please contact an administrator.", ephemeral=True)
+                    return
+
+        # Create ticket channel with proper permissions
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        }
+
+        # Add staff permissions dynamically
+        staff_roles = get_staff_roles(guild)
+        for staff_role in staff_roles:
+            overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+        ticket_channel = await guild.create_text_channel(
+            f"order-{ticket_number:04d}-{interaction.user.display_name}",
+            category=category,
+            overwrites=overwrites
+        )
 
         # Store ticket data
         ticket_id = f"purchase_{ticket_number:04d}_{interaction.user.id}"
@@ -491,7 +546,7 @@ class NewPurchaseModal(discord.ui.Modal, title='Create Purchase Order'):
 
         embed.add_field(
             name="💳 Payment Instructions",
-            value="**Please send payment to:**\n• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n\n**After payment, type what you want in this ticket!**",
+            value="**Please send payment to:**\n• **CashApp:** https://cash.app/$EthanCreel1\n• **Apple Pay:** 7656156371\n\n**After payment, let us know in this ticket!**",
             inline=False
         )
 
@@ -501,7 +556,7 @@ class NewPurchaseModal(discord.ui.Modal, title='Create Purchase Order'):
             inline=False
         )
 
-        embed.set_footer(text="ZSupply Private Order System • Staff will assist you")
+        embed.set_footer(text="RIA Gang Private Order System • Staff will assist you")
 
         # Create control view for staff
         view = PrivateTicketControlView(ticket_id)
@@ -524,7 +579,7 @@ class CalculatorView(discord.ui.View):
 
     async def update_embed(self, interaction):
         embed = discord.Embed(
-            title="🛒 ZSupply Cart & Calculator",
+            title="🛒 RIA Gang Cart & Calculator",
             description=f"**Add items to your cart:**\n\n🛒 **Cart Total: ${self.total:.2f}**",
             color=0x00ff00
         )
@@ -668,7 +723,7 @@ class CalculatorButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         calculator_view = CalculatorView()
         embed = discord.Embed(
-            title="🛒 ZSupply Cart & Calculator",
+            title="🛒 RIA Gang Cart & Calculator",
             description="**Add items to your cart:**\n\n🛒 **Cart Total: $0.00**",
             color=0x00ff00
         )
@@ -742,7 +797,7 @@ class PrivateTicketControlView(discord.ui.View):
             inline=False
         )
 
-        closure_embed.set_footer(text=f"ZSupply Order System • Ticket {action_type}")
+        closure_embed.set_footer(text="RIA Gang Order System • Ticket {action_type}")
 
         # Remove from active tickets
         if self.ticket_id in ACTIVE_ORDER_TICKETS:
@@ -752,7 +807,7 @@ class PrivateTicketControlView(discord.ui.View):
         # Send confirmation in same channel
         status_embed = discord.Embed(
             title=f"✅ Order {action_type.title()}",
-            description=f"This order has been {action_type}. Thank you for using ZSupply!",
+            description=f"This order has been {action_type}. Thank you for using RIA Gang!",
             color=0x00ff00 if action_type == "completed" else 0xff0000
         )
 
@@ -762,20 +817,9 @@ class PrivateTicketControlView(discord.ui.View):
         except:
             await interaction.response.send_message(embed=status_embed)
 
-# Keep old ShopMainView for backward compatibility
-class ShopMainView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
 
-    @discord.ui.button(label='🛒 Create Order', style=discord.ButtonStyle.success, emoji='🛒', custom_id='shop_create_order')
-    async def create_order(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(PurchaseTicketModal("ZSupply Shop", "All Games Available"))
 
-    @discord.ui.button(label='🎫 Support Ticket', style=discord.ButtonStyle.primary, emoji='🎫', custom_id='shop_support_ticket')
-    async def support_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(TicketModal())
 
-    
 
 # Purchase ticket system
 class PurchaseTicketModal(discord.ui.Modal, title='Create Purchase Order'):
@@ -806,12 +850,28 @@ class PurchaseTicketModal(discord.ui.Modal, title='Create Purchase Order'):
         TICKET_COUNTER += 1
 
         # Create order ticket channel
-        ORDER_TICKET_CHANNEL_ID = 1407347196906573889
-        ticket_channel = interaction.guild.get_channel(ORDER_TICKET_CHANNEL_ID)
+        # First try to find a suitable category and then create the channel
+        guild = interaction.guild
+        category = None
 
-        if not ticket_channel:
-            await interaction.response.send_message("❌ Order channel not found! Please contact an administrator.", ephemeral=True)
-            return
+        # Dynamically find or create the shop/ticket category
+        category_id = get_shop_ticket_category(guild)
+        if category_id:
+            category = guild.get_channel(category_id)
+
+        if not category:
+            # Try to find any category with shop/ticket keywords - do not create new ones
+            for cat in guild.categories:
+                if any(keyword in cat.name.lower() for keyword in ['shop', 'ticket', 'order', 'support']):
+                    category = cat
+                    break
+
+            if not category:
+                # Use the hardcoded category ID: 1409942998615199764
+                category = guild.get_channel(1409942998615199764)
+                if not category:
+                    await interaction.response.send_message("❌ Shop category not found! Please contact an administrator.", ephemeral=True)
+                    return
 
         # Store ticket data
         ticket_id = f"purchase_{ticket_number:04d}_{interaction.user.id}"
@@ -822,9 +882,28 @@ class PurchaseTicketModal(discord.ui.Modal, title='Create Purchase Order'):
             'products': self.product_selection.value,
             'special_requests': self.special_requests.value,
             'created_at': datetime.now().isoformat(),
-            'channel_id': ticket_channel.id
+            'channel_id': category.channels[0].id if category.channels else None # Fallback if no channels in category yet
         }
         save_data()
+
+        # Create ticket channel with proper permissions
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        }
+
+        # Add staff permissions dynamically
+        staff_roles = get_staff_roles(guild)
+        for staff_role in staff_roles:
+            overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+
+        ticket_channel = await guild.create_text_channel(
+            f"order-{ticket_number:04d}-{interaction.user.display_name}",
+            category=category,
+            overwrites=overwrites
+        )
+        ACTIVE_ORDER_TICKETS[ticket_id]['channel_id'] = ticket_channel.id # Update with actual channel ID
 
         # Create order embed
         embed = discord.Embed(
@@ -859,14 +938,15 @@ class PurchaseTicketModal(discord.ui.Modal, title='Create Purchase Order'):
             inline=False
         )
 
-        embed.set_footer(text="ZSupply Order System • Owner/Admin will assist you")
+        embed.set_footer(text="RIA Gang Order System • Owner/Admin will assist you")
 
         # Ping owner and admins
         ping_message = "**🔥 NEW PURCHASE ORDER - Owner/Admin assistance needed!**\n\n"
-        if OWNER_ROLE_ID:
-            ping_message += f"<@&{OWNER_ROLE_ID}> "
-        if STAFF_ROLE_ID:
-            ping_message += f"<@&{STAFF_ROLE_ID}>"
+        # Dynamically ping staff roles
+        staff_roles = get_staff_roles(guild)
+        if staff_roles:
+            for role in staff_roles:
+                ping_message += f"<@&{role.id}> "
 
         view = OrderTicketControlView(ticket_id)
         message = await ticket_channel.send(ping_message, embed=embed, view=view)
@@ -876,8 +956,6 @@ class PurchaseTicketModal(discord.ui.Modal, title='Create Purchase Order'):
         save_data()
 
         await interaction.response.send_message(f"✅ Purchase order created! Check {ticket_channel.mention} - Owner/Admin will assist you shortly!", ephemeral=True)
-
-# Removed ShopPurchaseView - now using simple embeds with ticket system instructions
 
 # Support ticket system
 class TicketModal(discord.ui.Modal, title='Create Support Ticket'):
@@ -906,9 +984,20 @@ class TicketModal(discord.ui.Modal, title='Create Support Ticket'):
 
         # Create ticket channel
         guild = interaction.guild
-        category = discord.utils.get(guild.categories, name="Support Tickets")
+        category = None
+
+        # Dynamically find or create the support ticket category
+        support_category_name = "Support Tickets"
+        for cat in guild.categories:
+            if cat.name == support_category_name:
+                category = cat
+                break
         if not category:
-            category = await guild.create_category("Support Tickets")
+            try:
+                category = await guild.create_category(support_category_name)
+            except Exception as e:
+                await interaction.response.send_message(f"❌ Could not create or find support category: {e}", ephemeral=True)
+                return
 
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -916,16 +1005,10 @@ class TicketModal(discord.ui.Modal, title='Create Support Ticket'):
             guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
         }
 
-        # Add staff and owner permissions
-        if STAFF_ROLE_ID:
-            staff_role = guild.get_role(STAFF_ROLE_ID)
-            if staff_role:
-                overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-
-        if OWNER_ROLE_ID:
-            owner_role = guild.get_role(OWNER_ROLE_ID)
-            if owner_role:
-                overwrites[owner_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        # Add staff permissions dynamically
+        staff_roles = get_staff_roles(guild)
+        for staff_role in staff_roles:
+            overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
         ticket_channel = await guild.create_text_channel(
             f"ticket-{ticket_number:04d}",
@@ -949,14 +1032,15 @@ class TicketModal(discord.ui.Modal, title='Create Support Ticket'):
             color=0x00ff00,
             timestamp=datetime.now()
         )
-        embed.set_footer(text="ZSells Support System")
+        embed.set_footer(text="RIA Gang Support System")
 
         # Ping roles
         ping_message = ""
-        if STAFF_ROLE_ID:
-            ping_message += f"<@&{STAFF_ROLE_ID}> "
-        if OWNER_ROLE_ID:
-            ping_message += f"<@&{OWNER_ROLE_ID}>"
+        # Dynamically ping staff roles
+        staff_roles = get_staff_roles(guild)
+        if staff_roles:
+            for role in staff_roles:
+                ping_message += f"<@&{role.id}> "
 
         view = TicketControlView(ticket_channel.id)
         await ticket_channel.send(ping_message, embed=embed, view=view)
@@ -986,7 +1070,17 @@ class OrderTicketControlView(discord.ui.View):
 
     async def _close_ticket(self, interaction, action_type):
         """Handle ticket closing and moving to closed channel"""
-        CLOSED_TICKET_CHANNEL_ID = 1407347198366191798
+        # Dynamically find the closed ticket channel ID
+        CLOSED_TICKET_CHANNEL_ID = None # Default to None, will try to find dynamically
+        guild = interaction.guild
+        for channel in guild.text_channels:
+            if any(keyword in channel.name.lower() for keyword in ['closed', 'archive', 'logs', 'history']):
+                CLOSED_TICKET_CHANNEL_ID = channel.id
+                break
+
+        if not CLOSED_TICKET_CHANNEL_ID:
+            await interaction.response.send_message("❌ Closed tickets channel not found. Please create one or contact an admin.", ephemeral=True)
+            return
 
         # Get ticket data
         ticket_data = ACTIVE_ORDER_TICKETS.get(self.ticket_id)
@@ -997,22 +1091,29 @@ class OrderTicketControlView(discord.ui.View):
         # Get closed tickets channel
         closed_channel = interaction.guild.get_channel(CLOSED_TICKET_CHANNEL_ID)
         if not closed_channel:
-            await interaction.response.send_message("❌ Closed tickets channel not found.", ephemeral=True)
+            await interaction.response.send_message("❌ Closed tickets channel not found or inaccessible.", ephemeral=True)
             return
 
         # Create closure summary embed
         closure_embed = discord.Embed(
             title=f"🔒 Purchase Order #{ticket_data['ticket_number']:04d} - {action_type.title()}",
-            description=f"**Customer:** <@{ticket_data['user_id']}>\n**Shop:** {ticket_data['shop']}\n**Status:** {action_type.title()}",
+            description=f"**Customer:** <@{ticket_data['user_id']}>\n**Shop:** {ticket_data.get('shop', 'N/A')}\n**Status:** {action_type.title()}",
             color=0x00ff00 if action_type == "completed" else 0xff0000,
             timestamp=datetime.now()
         )
 
-        closure_embed.add_field(
-            name="🛍️ Ordered Products",
-            value=f"```{ticket_data.get('products', 'No products listed')}```",
-            inline=False
-        )
+        if 'cart_summary' in ticket_data:
+            closure_embed.add_field(
+                name="🛒 Cart Order",
+                value=f"```{ticket_data.get('cart_summary', 'No cart data')}```",
+                inline=False
+            )
+        else:
+            closure_embed.add_field(
+                name="🛍️ Ordered Items",
+                value=f"```{ticket_data.get('products', 'No products listed')}```",
+                inline=False
+            )
 
         if ticket_data.get('special_requests'):
             closure_embed.add_field(
@@ -1027,7 +1128,7 @@ class OrderTicketControlView(discord.ui.View):
             inline=False
         )
 
-        closure_embed.set_footer(text=f"ZSupply Order System • Ticket {action_type}")
+        closure_embed.set_footer(text="RIA Gang Order System • Ticket {action_type}")
 
         # Send to closed channel
         await closed_channel.send(embed=closure_embed)
@@ -1040,7 +1141,7 @@ class OrderTicketControlView(discord.ui.View):
         # Send confirmation
         status_embed = discord.Embed(
             title=f"✅ Order {action_type.title()}",
-            description=f"This order has been {action_type}. Thank you for using ZSupply!",
+            description=f"This order has been {action_type}. Thank you for using RIA Gang!",
             color=0x00ff00 if action_type == "completed" else 0xff0000
         )
 
@@ -1078,15 +1179,15 @@ class GangRecruitmentView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label='Join STK Gang', style=discord.ButtonStyle.success, emoji='⚔️', custom_id='gang_join_stk')
+    @discord.ui.button(label='Join RIA Gang', style=discord.ButtonStyle.success, emoji='⚔️', custom_id='gang_join_ria')
     async def join_gang(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
             if interaction.response.is_done():
                 return
 
             embed = discord.Embed(
-                title="🎉 Welcome to STK Gang!",
-                description="**You're about to join one of the most elite gangs!**\n\nMake sure you're ready to represent STK across all games.",
+                title="🎉 Welcome to RIA Gang!",
+                description="**You're about to join one of the most elite gangs for Philly Streets!**\n\nMake sure you're ready to represent RIA by risking it all.",
                 color=0x00ff00
             )
             embed.add_field(
@@ -1096,10 +1197,10 @@ class GangRecruitmentView(discord.ui.View):
             )
             embed.add_field(
                 name="🔗 Join Our Gang Discord",
-                value="**Click here to join:** https://discord.gg/7rG6jVTVmX",
+                value="**Click here to join:** https://discord.gg/7rG6jVTVmX", # Replace with actual RIA Gang Discord link if available
                 inline=False
             )
-            embed.set_footer(text="STK Gang • Elite Members Only • Wear your colors with pride!")
+            embed.set_footer(text="RIA Gang • Risking it all for Philly Streets • Wear your colors with pride!")
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -1113,348 +1214,7 @@ class GangRecruitmentView(discord.ui.View):
         except Exception as e:
             print(f"⚠️ Error in gang recruitment: {e}")
 
-# Create eye-catching shop embeds
-def create_tb3_showcase_embed():
-    embed = discord.Embed(
-        title="🗽 **THE BRONX 3** 🗽",
-        description="═══════════════════════════════════════\n🔥 **PREMIUM TB3 SERVICES** 🔥\n═══════════════════════════════════════",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
 
-    # Add animated-looking banner
-    embed.add_field(
-        name="💫 ═══ FEATURED PRODUCTS ═══ 💫",
-        value="```css\n🔫 ELITE WEAPONS COLLECTION\n💰 MONEY & BANK SERVICES\n⌚ LUXURY WATCHES COLLECTION\n📦 SPECIAL PACKAGES```",
-        inline=False
-    )
-
-    # Weapons showcase
-    weapons_display = ""
-    featured_weapons = WEAPONS[:12]  # Show first 12 weapons
-    for i, weapon in enumerate(featured_weapons, 1):
-        weapons_display += f"`{i:02d}.` **{weapon}**\n"
-
-    embed.add_field(
-        name="🔫 ═══ PREMIUM WEAPONS ═══ 🔫",
-        value=weapons_display + f"\n*...and {len(WEAPONS)-12} more weapons available!*",
-        inline=True
-    )
-
-    # Money services
-    embed.add_field(
-        name="💰 ═══ MONEY SERVICES ═══ 💰",
-        value="```yaml\n🏦 Bank 990k - $1.00\n💵 Clean 990k - $1.00\n💎 Bank 1.6M (GP) - $2.00\n✨ Clean 1.6M (GP) - $2.00\n\n🚀 INSTANT DELIVERY\n✨ 24/7 SUPPORT```",
-        inline=True
-    )
-
-    # Watches showcase  
-    watches_display = ""
-    featured_watches = WATCHES[:8]
-    for watch in featured_watches:
-        watches_display += f"⌚ **{watch}**\n"
-
-    embed.add_field(
-        name="⌚ ═══ LUXURY WATCHES ═══ ⌚",
-        value=watches_display + f"\n*...and {len(WATCHES)-8} more watches!*\n\n💰 **Only $1.00 each**",
-        inline=False
-    )
-
-    # Pricing packages
-    embed.add_field(
-        name="📦 ═══ WEAPON PACKAGES ═══ 📦",
-        value="```diff\n+ SAFE PACKAGE - $3.00 per weapon\n+ BAG PACKAGE - $2.00 per weapon  \n+ TRUNK PACKAGE - $1.00 per weapon\n\n! BULK DISCOUNTS AVAILABLE```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🎯 ═══ WHY CHOOSE US? ═══ 🎯",
-        value="```css\n✅ INSTANT DELIVERY\n✅ PREMIUM QUALITY  \n✅ 24/7 CUSTOMER SUPPORT\n✅ SECURE TRANSACTIONS\n✅ MONEY-BACK GUARANTEE\n✅ TRUSTED BY 1000+ CUSTOMERS```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🛒 ═══ HOW TO ORDER ═══ 🛒",
-        value="```yaml\n📝 Create a support ticket in #support\n💬 Tell us what you want to buy\n💳 Complete payment via our methods\n🚀 Receive your order instantly!\n\n💰 PAYMENT METHODS:\n• CashApp: https://cash.app/$EthanCreel1\n• Apple Pay: 7656156371\n• PayPal: Coming Soon```",
-        inline=False
-    )
-
-    embed.set_footer(text="🔥 ZSupply TB3 • Create a support ticket to place your order! 🔥")
-    return embed
-
-def create_philly_showcase_embed():
-    embed = discord.Embed(
-        title="🦅 **PHILLY STREETS 2** 🦅",
-        description="═══════════════════════════════════════\n⚡ **ULTIMATE PS2 PARADISE** ⚡\n═══════════════════════════════════════",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
-
-    embed.add_field(
-        name="💎 ═══ MONEY SERVICES ═══ 💎",
-        value="```css\n🔥 $1 PER MILLION - BEST RATES!\n💰 Minimum: 1 Million ($1.00)\n💎 Maximum: 10 Million ($10.00)\n🚀 INSTANT DELIVERY GUARANTEED\n\n[1M] [2M] [3M] [4M] [5M]\n[6M] [7M] [8M] [9M] [10M]```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🎮 ═══ PREMIUM ACCOUNTS ═══ 🎮",
-        value="```yaml\n💰 MAX MONEY ACCOUNT - $3.00\n   └ 5M Cash + 5M Bank + 200+ Days\n\n📊 MODDED STATS + MAX MONEY - $6.00\n   └ Enhanced Stats + Max Money\n\n⭐ FULLY STACKED ACCOUNT - $8.00\n   └ Max Money + Custom Name + Stats\n\n♾️ PERM INF MONEY ACCOUNT - $10.00\n   └ Unlimited Money Transfers```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🌟 ═══ EXCLUSIVE FEATURES ═══ 🌟",
-        value="```diff\n+ AUTO-CALCULATED PRICING\n+ REAL-TIME MONEY DELIVERY\n+ CUSTOM NAME CHANGES\n+ MODDED STATISTICS\n+ UNLIMITED BANK TRANSFERS\n+ FROZEN MONEY PROTECTION```",
-        inline=True
-    )
-
-    embed.add_field(
-        name="⚡ ═══ SPEED & QUALITY ═══ ⚡",
-        value="```css\n🚀 DELIVERY: INSTANT\n🛡️ SECURITY: MAXIMUM\n💎 QUALITY: PREMIUM\n⏰ SUPPORT: 24/7\n📈 SUCCESS RATE: 99.9%\n🔥 CUSTOMER RATING: 5/5```",
-        inline=True
-    )
-
-    embed.add_field(
-        name="🛒 ═══ HOW TO ORDER ═══ 🛒",
-        value="```yaml\n📝 Create a support ticket in #support\n💬 Specify what you want to purchase\n💳 Complete payment via our methods\n🚀 Receive your order instantly!\n\n💰 PAYMENT METHODS:\n• CashApp: https://cash.app/$EthanCreel1\n• Apple Pay: 7656156371\n• PayPal: Coming Soon```",
-        inline=False
-    )
-
-    embed.set_footer(text="⚡ ZSupply PS2 • Create a support ticket to place your order! ⚡")
-    return embed
-
-def create_south_bronx_showcase_embed():
-    embed = discord.Embed(
-        title="🔥 **SOUTH BRONX THE TRENCHES** 🔥",
-        description="═══════════════════════════════════════\n💀 **THE ULTIMATE MODDED ACCOUNT** 💀\n═══════════════════════════════════════",
-        color=0xff0000,
-        timestamp=datetime.now()
-    )
-
-    embed.add_field(
-        name="💀 ═══ LEGENDARY ACCOUNT ═══ 💀",
-        value="```css\n🔥 ONLY $3.00 - INSANE VALUE!\n\n💰 CLEAN MONEY: 1.750M\n🏦 BANK MONEY: 1.750M  \n📊 TOTAL VALUE: 3.5M\n⏰ ACCOUNT AGE: 200+ DAYS\n🎰 LUCKY WEAPONS: INCLUDED*```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🎯 ═══ WHAT YOU GET ═══ 🎯",
-        value="```diff\n+ 200+ DAY OLD ROBLOX ACCOUNT\n+ MAXIMUM MONEY (3.5M TOTAL)\n+ ACCOUNT USERNAME & PASSWORD\n+ COMPLETE SETUP INSTRUCTIONS\n+ 24/7 PREMIUM SUPPORT\n+ INSTANT DELIVERY\n\n! *WEAPONS IF YOU'RE LUCKY!```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="⚡ ═══ UNBEATABLE VALUE ═══ ⚡",
-        value="```yaml\nRegular Price: $15.00\nOUR PRICE: $3.00\nYOU SAVE: $12.00\n\nTHAT'S 80% OFF!\n\n🔥 LIMITED TIME OFFER\n⭐ BEST DEAL GUARANTEED```",
-        inline=True
-    )
-
-    embed.add_field(
-        name="🛡️ ═══ QUALITY PROMISE ═══ 🛡️",
-        value="```css\n✅ AGED ACCOUNT GUARANTEED\n✅ MONEY PRE-LOADED\n✅ INSTANT ACCESS\n✅ NO HIDDEN FEES\n✅ FULL CUSTOMER SUPPORT\n✅ SATISFACTION GUARANTEED```",
-        inline=True
-    )
-
-    embed.add_field(
-        name="🛒 ═══ HOW TO ORDER ═══ 🛒",
-        value="```yaml\n📝 Create a support ticket in #support\n💬 Request South Bronx account\n💳 Complete payment via our methods\n🚀 Receive your account instantly!\n\n💰 PAYMENT METHODS:\n• CashApp: https://cash.app/$EthanCreel1\n• Apple Pay: 7656156371\n• PayPal: Coming Soon```",
-        inline=False
-    )
-
-    embed.set_footer(text="💀 ZSupply SB • Create a support ticket to claim your account! 💀")
-    return embed
-
-def create_roblox_alts_showcase_embed():
-    embed = discord.Embed(
-        title="🎮 **ROBLOX ALTS SHOP** 🎮",
-        description="═══════════════════════════════════════\n🌟 **PREMIUM AGED ACCOUNTS** 🌟\n═══════════════════════════════════════",
-        color=0x7289da,
-        timestamp=datetime.now()
-    )
-
-    embed.add_field(
-        name="🔥 ═══ ACCOUNT FEATURES ═══ 🔥",
-        value="```css\n⏰ AGE: 200+ DAYS GUARANTEED\n🎮 STATUS: FULLY STACKED\n💎 QUALITY: HAND-PICKED PREMIUM\n🚀 DELIVERY: INSTANT ACCESS\n🛡️ SECURITY: MAXIMUM PROTECTION```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🎯 ═══ AVAILABLE GAMES ═══ 🎯",
-        value="```yaml\n🗽 THE BRONX 3 ACCOUNT - $3.00\n   └ Max money + Premium items\n\n🦅 PHILLY STREETS 2 ACCOUNT - $3.00\n   └ Stacked cash + Lucky weapons\n\n🔥 SOUTH BRONX ACCOUNT - $3.00\n   └ 3.5M money + Elite status```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="📦 ═══ INCLUDED WITH EVERY ACCOUNT ═══ 📦",
-        value="```diff\n+ ACCOUNT USERNAME & PASSWORD\n+ STACKED IN-GAME MONEY\n+ PREMIUM ITEMS & WEAPONS\n+ COMPLETE SETUP GUIDE\n+ BACKUP EMAIL ACCESS\n+ 24/7 CUSTOMER SUPPORT\n+ SATISFACTION GUARANTEE```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="⭐ ═══ WHY CHOOSE OUR ALTS? ═══ ⭐",
-        value="```css\n🔸 200+ DAYS OLD = TRUSTED\n🔸 HAND-PICKED = QUALITY\n🔸 PRE-LOADED = READY TO PLAY\n🔸 INSTANT = NO WAITING\n🔸 SUPPORT = ALWAYS AVAILABLE\n🔸 GUARANTEE = YOUR SATISFACTION```",
-        inline=False
-    )
-
-    embed.add_field(
-        name="🛒 ═══ HOW TO ORDER ═══ 🛒",
-        value="```yaml\n📝 Create a support ticket in #support\n💬 Specify which game account you want\n💳 Complete payment via our methods\n🚀 Receive your account instantly!\n\n💰 PAYMENT METHODS:\n• CashApp: https://cash.app/$EthanCreel1\n• Apple Pay: 7656156371\n• PayPal: Coming Soon```",
-        inline=False
-    )
-
-    embed.set_footer(text="🎮 ZSupply Roblox Alts • Create a support ticket to get your account! 🎮")
-    return embed
-
-# Embed creation functions for other content
-def create_support_embed():
-    embed = discord.Embed(
-        title="🎫 ZSells Support Center",
-        description="**Need help? Our support team is here to assist you 24/7!**",
-        color=0x3498db,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="📞 What we can help with:",
-        value="• Order issues\n• Payment problems\n• Product questions\n• Technical support\n• General inquiries",
-        inline=False
-    )
-    embed.add_field(
-        name="📋 How it works",
-        value="1. Click the Create Ticket button below\n2. Describe your issue in detail\n3. Our staff will respond promptly\n4. Get the help you need!",
-        inline=False
-    )
-    embed.add_field(
-        name="⏰ Response Time",
-        value="• **Average:** 15 minutes\n• **Maximum:** 2 hours\n• **24/7 availability**",
-        inline=True
-    )
-    embed.add_field(
-        name="⭐ Support Quality",
-        value="• Expert staff\n• Quick resolutions\n• 99% satisfaction rate",
-        inline=True
-    )
-    embed.set_footer(text="ZSells Support Center • Click below to create a ticket")
-    return embed
-
-def create_gang_embed():
-    embed = discord.Embed(
-        title="⚔️ STK Gang Recruitment",
-        description="**Join the Elite STK Gang!**\n\nWe're recruiting skilled players for our elite gang across multiple games.",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🎮 Available Games",
-        value="• **The Bronx 3**\n• **Philly Streets 2**\n• **South Bronx The Trenches**",
-        inline=False
-    )
-    embed.add_field(
-        name="👕 Required Outfit",
-        value="**Must wear when representing STK:**\n• **SHIRT:** Green Varsity\n• **PANTS:** Green Ripped Jeans",
-        inline=False
-    )
-    embed.add_field(
-        name="📋 Requirements",
-        value="• Active player in any of our games\n• Follow gang dress code\n• Be respectful to other members\n• Participate in gang activities",
-        inline=False
-    )
-    embed.add_field(
-        name="🌟 Gang Benefits",
-        value="• Elite gang members\n• Skilled teammates\n• Exclusive gang discord\n• Special privileges\n• Gang protection",
-        inline=False
-    )
-    embed.set_footer(text="STK Gang • Elite recruitment across all games")
-    return embed
-
-def create_tos_embed():
-    embed = discord.Embed(
-        title="📋 Terms of Service",
-        description="**ZSells Terms of Service - Please Read Carefully**\n\nBy using our services, you agree to the following terms:",
-        color=0x3498db,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="💳 Account & Payment",
-        value="• All sales are final\n• No refunds on digital goods\n• Payment required before delivery\n• Account sharing prohibited\n• Valid payment methods only",
-        inline=False
-    )
-    embed.add_field(
-        name="📦 Product Delivery",
-        value="• Delivery within 24 hours\n• Customer must be online for delivery\n• Products delivered as described\n• No guarantee on in-game performance\n• Contact support for delivery issues",
-        inline=False
-    )
-    embed.add_field(
-        name="⚖️ Legal & Compliance",
-        value="• Must be 18+ or have parental consent\n• Use products responsibly\n• No reselling without permission\n• Comply with game terms of service\n• Report issues promptly",
-        inline=False
-    )
-    embed.add_field(
-        name="🚫 Prohibited Activities",
-        value="• Chargebacks result in permanent ban\n• No abuse of support system\n• No sharing account credentials\n• No harassment of staff\n• No fraudulent activities",
-        inline=False
-    )
-    embed.set_footer(text="ZSells • By using our services, you agree to these terms")
-    return embed
-
-def create_rules_embed():
-    embed = discord.Embed(
-        title="📜 Server Rules",
-        description="**Welcome to ZSells Community!**\n\nPlease follow these rules to maintain a safe environment:",
-        color=0xe74c3c,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="1️⃣ Strictly 16+ Only",
-        value="This server is for adults only. You must be 16 years or older to be here. Lying about your age will result in an immediate and permanent ban.",
-        inline=False
-    )
-    embed.add_field(
-        name="2️⃣ No Discussion of Real-World Violence or Harm",
-        value="This is a service hub for digital goods, not a place to discuss real-world activities. Any talk of real violence, weapons, or causing physical harm is strictly forbidden and will result in a ban.",
-        inline=False
-    )
-    embed.add_field(
-        name="3️⃣ Be Clear & Professional in Business Deals",
-        value="When buying or selling, state exactly what you are offering or looking for. Be clear on prices, payment methods, and account details. Do not try to scam or mislead other members.",
-        inline=False
-    )
-    embed.add_field(
-        name="4️⃣ Use the Correct Channels",
-        value="Post your offers, questions, and deals only in the channels meant for them. Keep general chat clean and on-topic. Do not spam the same message across multiple channels.",
-        inline=False
-    )
-    embed.add_field(
-        name="5️⃣ No Chargebacks or Fraudulent Payments",
-        value="Once a deal is complete, it is final. Filing a chargeback or using fraudulent payment methods (stolen cards, etc.) will result in a permanent ban and being publicly blacklisted.",
-        inline=False
-    )
-    embed.set_footer(text="ZSells Community • More rules available - Contact staff for questions")
-    return embed
-
-def create_welcome_embed():
-    embed = discord.Embed(
-        title="🎉 Welcome to ZSells Community!",
-        description="**Welcome to our amazing community!**\n\nWe're excited to have you here. Get started by exploring our channels and services!",
-        color=0x00ff00,
-        timestamp=datetime.now()
-    )
-    embed.add_field(
-        name="🚀 Getting Started",
-        value="• Read our rules and guidelines\n• Check out our shop for premium items\n• Browse our premium services\n• Create a support ticket if you need help",
-        inline=False
-    )
-    embed.add_field(
-        name="🌟 Community Benefits",
-        value="• Premium services\n• 24/7 support\n• Exclusive deals\n• Premium products\n• Trusted community",
-        inline=False
-    )
-    embed.add_field(
-        name="🔗 Quick Links",
-        value="• **Shop** - Premium products\n• **Support** - Get help instantly\n• **Services** - Premium offerings\n• **Rules** - Community guidelines",
-        inline=False
-    )
-    embed.set_footer(text="ZSells Community • Your premium gaming destination!")
-    return embed
 
 # Utility functions
 def check_channel_permissions(channel):
@@ -1468,6 +1228,31 @@ def check_channel_permissions(channel):
             permissions.embed_links and
             permissions.read_message_history)
 
+# --- Dynamic Authorization Function ---
+def is_authorized_user(user_id, guild):
+    """
+    Checks if a user is authorized to use specific commands.
+    Authorization is based on having administrator permissions or a role identified as staff.
+    """
+    if not guild:
+        return False # Cannot authorize without a guild context
+
+    member = guild.get_member(user_id)
+    if not member:
+        return False # Member not found in guild
+
+    # Check for administrator permissions
+    if member.guild_permissions.administrator:
+        return True
+
+    # Check if the member has any of the dynamically detected staff roles
+    staff_roles = get_staff_roles(guild)
+    for role in member.roles:
+        if role in staff_roles:
+            return True
+
+    return False # User is not authorized
+
 @bot.event
 async def on_ready():
     global CHANNELS, GUILD_ANALYSIS
@@ -1476,8 +1261,6 @@ async def on_ready():
     # Add persistent views
     bot.add_view(SupportView())
     bot.add_view(GangRecruitmentView())
-    bot.add_view(ShopMainView())
-    bot.add_view(NewShopView())
 
     # Sync slash commands
     try:
@@ -1496,414 +1279,68 @@ async def on_ready():
         print(f"\n🏰 Analyzing guild: {guild.name} (ID: {guild.id})")
         detected_channels = get_channels_by_name(guild)
         CHANNELS.update(detected_channels)
-        
+
         # Perform full guild analysis
         GUILD_ANALYSIS[guild.id] = analyze_guild_structure(guild)
 
-    # Auto-setup all embeds in their respective channels
-    await auto_setup_all_embeds()
+    # Auto-setup disabled - only ticket creation enabled
+    print("✅ Auto-setup disabled - only ticket creation enabled")
 
-    print('\n🤖 Pure Discord Bot Running - No Web Interface')
+# --- Slash Commands ---
 
-async def auto_setup_all_embeds():
-    """Automatically setup all embeds in their respective channels"""
+@bot.tree.command(name="ria_info", description="Display information about RIA gang and head members")
+async def ria_info(interaction: discord.Interaction):
+    """Display RIA gang information and head members"""
     try:
-        # Setup support panel
-        if 'support' in CHANNELS:
-            support_channel = bot.get_channel(CHANNELS['support'])
-            if support_channel and check_channel_permissions(support_channel):
-                try:
-                    embed = create_support_embed()
-                    view = SupportView()
-                    await support_channel.send(embed=embed, view=view)
-                    print("✅ Support panel auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{support_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up support panel: {e}")
-
-        # Setup general channel (formerly gang recruitment)
-        if 'general' in CHANNELS:
-            general_channel = bot.get_channel(CHANNELS['general'])
-            if general_channel and check_channel_permissions(general_channel):
-                try:
-                    # Only setup welcome message in general channel
-                    print(f"✅ General channel detected: #{general_channel.name}")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{general_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error with general channel: {e}")
-
-        # Setup ToS
-        if 'tos' in CHANNELS:
-            tos_channel = bot.get_channel(CHANNELS['tos'])
-            if tos_channel and check_channel_permissions(tos_channel):
-                try:
-                    embed = create_tos_embed()
-                    await tos_channel.send(embed=embed)
-                    print("✅ Terms of Service auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{tos_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up ToS: {e}")
-
-        # Setup Rules
-        if 'rules' in CHANNELS:
-            rules_channel = bot.get_channel(CHANNELS['rules'])
-            if rules_channel and check_channel_permissions(rules_channel):
-                try:
-                    embed = create_rules_embed()
-                    await rules_channel.send(embed=embed)
-                    print("✅ Server rules auto-setup complete!")
-                except discord.Forbidden:
-                    print(f"❌ No permission to send messages in #{rules_channel.name}")
-                except Exception as e:
-                    print(f"❌ Error setting up rules: {e}")
-
-        # Setup News
-        if 'news' in CHANNELS:
-            news_channel = bot.get_channel(CHANNELS['news'])
-            if news_channel and check_channel_permissions(news_channel):
-                try:
-                    if not NEWS_DATA["last_updated"]:
-                        NEWS_DATA["last_updated"] = datetime.now().isoformat()
-                        save_data()
-                    print("✅ News channel detected")
-                except Exception as e:
-                    print(f"❌ Error with news setup: {e}")
-
-    except Exception as e:
-        print(f"Error in auto-setup: {e}")
-
-# Utility functions
-def is_authorized_user(user_id):
-    """Check if user is authorized to run spawn commands"""
-    return user_id == 1385239185006268457
-
-# New ZSupply shop spawn command with ticket system and calculator
-@bot.tree.command(name="spawn_shops", description="Spawn ZSupply shop with ticket system")
-async def spawn_shops(interaction: discord.Interaction):
-    """Spawn new ZSupply shop with working ticket system and calculator"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
+        # Check authorization using dynamic detection
+        if not is_authorized_user(interaction.user.id, interaction.guild):
+            await interaction.response.send_message("❌ You are not authorized to use this command. You need administrator permissions or an admin role.", ephemeral=True)
             return
 
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ ZSupply shop spawned successfully!", ephemeral=True)
-
-        # Create new ZSupply shop embed
+        # Create RIA info embed
         embed = discord.Embed(
-            title="⚡ ZSELLS ⚡",
-            description="**Trusted By 50+ • Best Prices • 24/7 SUPPORT**",
-            color=0x000000,
+            title="💜 RIA GANG - RISKING IT ALL 💜",
+            description="**Welcome to RIA Gang - Where legends are made and fear is earned.**\n\nRIA stands for **Risking It All** - we're the most respected and feared organization running the streets of Philadelphia. When you see purple, you know you're in RIA territory.",
+            color=0x8A2BE2,
             timestamp=datetime.now()
         )
-
-        # Add header image
-        embed.set_image(url="https://cdn.discordapp.com/attachments/1407347218951700534/1409618120515260570/Electric_Fury_of_ZSELLS.png?ex=68ae08ad&is=68acb72d&hm=c2de3ae059568166e9faa9f459b01819e279c00f654fdc3a6bfbd7e531cac28f&")
-
+        
         embed.add_field(
-            name="🗽 THE BRONX 3",
-            value="**Dupe of your choice**\n• Watches: **$1 each**\n• Money 990k (Bank/Clean): **$1 each**\n• Money 1.6M (Gamepass Only): **$2 each**\n• Packages:\n  - Safe Package: **$5**\n  - Bag Package: **$3**\n  - Trunk Package: **$2**",
-            inline=True
-        )
-
-        embed.add_field(
-            name="🦅 PHILLY STREETS 2",
-            value="• Money: **$1 per Million**\n• Max Account: **$3**\n• Stats + Money: **$6**\n• Fully Stacked Account: **$8**\n• ROLLBACK! ACCOUNT: **$10**",
-            inline=True
-        )
-
-        embed.add_field(
-            name="⚡ HOW TO ORDER",
-            value="**Click the button below to:**\n🧮 Calculate your order then purchase\n\n**Fast Delivery • Secure Payment**",
+            name="👑 THE LEADERSHIP",
+            value="**Boss:** <@1099478092625477672>\n**Underboss:** <@1401979784623554743>\n**Underboss:** <@1385239185006268457>",
             inline=False
         )
-
-        embed.set_footer(text="⚡ BUY HERE ⚡")
-        embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/1407347218951700534/1409618121051865168/Lightning-Powered__BUY_HERE__Design.png?ex=68ae08ad&is=68acb72d&hm=30c3b2adf6aa6a0cc489a309df85b9f5b1e44067f9b3170d0437b7297a05930f&")
-
-        # Create view with new buttons
-        view = NewShopView()
-        await interaction.channel.send(embed=embed, view=view)
-
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning shops: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning shops: {e}", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="spawn_support", description="Spawn support ticket panel")
-async def spawn_support(interaction: discord.Interaction):
-    """Spawn support ticket interface"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
-
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ Support panel spawned successfully!", ephemeral=True)
-
-        # Then send the public panel directly to the channel
-        embed = create_support_embed()
-        view = SupportView()
-        await interaction.channel.send(embed=embed, view=view)
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning support panel: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning support panel: {e}", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="spawn_gang", description="Spawn gang recruitment panel")
-async def spawn_gang(interaction: discord.Interaction):
-    """Spawn gang recruitment interface"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
-
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ Gang recruitment panel spawned successfully!", ephemeral=True)
-
-        # Then send the public panel directly to the channel
-        embed = create_gang_embed()
-        view = GangRecruitmentView()
-        await interaction.channel.send(embed=embed, view=view)
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning gang panel: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning gang panel: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
-
-@bot.tree.command(name="spawn_tos", description="Spawn Terms of Service")
-async def spawn_tos(interaction: discord.Interaction):
-    """Spawn Terms of Service embed"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
-
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ Terms of Service spawned successfully!", ephemeral=True)
-
-        # Then send the public panel directly to the channel
-        embed = create_tos_embed()
-        await interaction.channel.send(embed=embed)
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning TOS: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning TOS: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
-
-@bot.tree.command(name="spawn_rules", description="Spawn server rules")
-async def spawn_rules(interaction: discord.Interaction):
-    """Spawn server rules embed"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
-
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ Server rules spawned successfully!", ephemeral=True)
-
-        # Then send the public panel directly to the channel
-        embed = create_rules_embed()
-        await interaction.channel.send(embed=embed)
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning rules: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning rules: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
-
-@bot.tree.command(name="spawn_welcome", description="Spawn welcome message")
-async def spawn_welcome(interaction: discord.Interaction):
-    """Spawn welcome message embed"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
-
-        # First respond privately to confirm command
-        await interaction.response.send_message("✅ Welcome message spawned successfully!", ephemeral=True)
-
-        # Then send the public panel directly to the channel
-        embed = create_welcome_embed()
-        await interaction.channel.send(embed=embed)
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error spawning welcome: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error spawning welcome: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
-
-@bot.tree.command(name="news", description="Spawn news update")
-async def news(interaction: discord.Interaction, title: str = None, content: str = None):
-    """Spawn news update in the news channel"""
-    try:
-        # Check authorization
-        if not is_authorized_user(interaction.user.id):
-            await interaction.response.send_message("❌ You are not authorized to use this command.", ephemeral=True)
-            return
-
-        # Use provided content or default news
-        news_title = title or "📰 Latest News Update"
-        news_content = content or "Stay tuned for important announcements and updates!"
-
-        embed = discord.Embed(
-            title=news_title,
-            description=news_content,
-            color=0xff6b6b,
-            timestamp=datetime.now()
-        )
+        
         embed.add_field(
-            name="📢 Important Information",
-            value="• Check back regularly for updates\n• Follow server announcements\n• Contact support if you have questions",
+            name="🎯 WHAT WE CONTROL",
+            value="• **Our Territory:** Dead end behind the gas station - RIA turf\n• **Full Philly Streets Shop:** Complete inventory for verified sellers\n• **The Money:** Business moves fast when you're with us\n• **The Respect:** Our name carries weight on these streets\n• **The Family:** Blood in, blood out - we protect our own",
             inline=False
         )
-        embed.set_footer(text="ZSells News • Stay informed")
-
-        # Send directly to the channel where command was used
-        await interaction.channel.send(embed=embed)
-
-        # Private confirmation
-        await interaction.response.send_message("✅ News posted successfully!", ephemeral=True)
-
-        # Update news data
-        global NEWS_DATA
-        NEWS_DATA = {
-            "title": news_title,
-            "content": news_content,
-            "last_updated": datetime.now().isoformat()
-        }
-        save_data()
-
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
-    except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error posting news: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error posting news: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
-
-@bot.tree.command(name="reminder", description="Set a reminder")
-async def reminder(interaction: discord.Interaction, time: str, message: str):
-    """Set a reminder for a specific time"""
-    try:
-        await interaction.response.defer(ephemeral=True)
-
-        import re
-
-        # Parse time (simple format: 5m, 1h, 30s)
-        time_pattern = r'^(\d+)([smh])$'
-        match = re.match(time_pattern, time.lower())
-
-        if not match:
-            await interaction.followup.send("❌ Invalid time format! Use: 30s, 5m, 1h", ephemeral=True)
-            return
-
-        duration = int(match.group(1))
-        unit = match.group(2)
-
-        # Convert to seconds
-        if unit == 's':
-            seconds = duration
-        elif unit == 'm':
-            seconds = duration * 60
-        elif unit == 'h':
-            seconds = duration * 3600
-
-        if seconds > 86400:  # Max 24 hours
-            await interaction.followup.send("❌ Maximum reminder time is 24 hours!", ephemeral=True)
-            return
-
-        # Create reminder embed
-        embed = discord.Embed(
-            title="⏰ Reminder Set",
-            description=f"I'll remind you in **{time}** about:\n\n*{message}*",
-            color=0x00ff00,
-            timestamp=datetime.now()
+        
+        embed.add_field(
+            name="💜 GANG COLORS & REQUIREMENTS",
+            value="**MANDATORY:** Purple Flag 🏴\n**COLORS:** Purple everything when you're repping\n**NO EXCEPTIONS:** You wear purple, you ARE RIA\n\n*Purple is power. Purple is respect. Purple is RIA.*",
+            inline=False
         )
-        embed.set_footer(text="ZSupply Reminder System")
-
-        await interaction.followup.send(embed=embed, ephemeral=True)
-
-        # Wait and send reminder
-        await asyncio.sleep(seconds)
-
-        reminder_embed = discord.Embed(
-            title="🔔 Reminder",
-            description=f"**You asked me to remind you:**\n\n*{message}*",
-            color=0xff9500,
-            timestamp=datetime.now()
+        
+        embed.add_field(
+            name="📜 THE CODE",
+            value="• **Loyalty Above All:** Your crew comes first, always\n• **Respect the Purple:** Wear your colors with pride\n• **Stay Active:** Dead weight gets cut loose\n• **Handle Business:** When RIA calls, you answer\n• **One Family:** We ride together, we die together",
+            inline=False
         )
-        reminder_embed.set_footer(text="ZSupply Reminder System")
+        
+        embed.add_field(
+            name="💪 WHY YOU NEED RIA",
+            value="• **Protection:** Nobody touches RIA family\n• **Resources:** Money, connections, power\n• **Reputation:** Fear and respect follow our name\n• **Success:** We turn soldiers into bosses\n• **Legacy:** Join something bigger than yourself",
+            inline=False
+        )
+        
+        embed.set_footer(text="RIA Gang • Purple Reign • Respect Earned, Never Given")
 
-        try:
-            await interaction.followup.send(f"{interaction.user.mention}", embed=reminder_embed)
-        except:
-            # Fallback to DM if followup fails
-            try:
-                await interaction.user.send(embed=reminder_embed)
-            except:
-                pass  # User has DMs disabled
+        await interaction.response.send_message(embed=embed)
 
-    except discord.NotFound:
-        pass
-    except discord.InteractionResponded:
-        pass
     except Exception as e:
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message(f"Error setting reminder: {e}", ephemeral=True)
-            else:
-                await interaction.followup.send(f"Error setting reminder: {e}", ephemeral=True)
-        except (discord.NotFound, discord.InteractionResponded):
-            pass
+        await interaction.response.send_message(f"Error displaying RIA info: {e}", ephemeral=True)
 
 # Run the bot
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
