@@ -23,18 +23,6 @@ def load_data():
                 data['stored_embeds'] = {}
             if 'embed_counter' not in data:
                 data['embed_counter'] = 1
-            if 'ticket_counter' not in data:
-                data['ticket_counter'] = 1
-            if 'active_tickets' not in data:
-                data['active_tickets'] = {}
-            if 'ticket_settings' not in data:
-                data['ticket_settings'] = {
-                    'support_role_id': None,
-                    'admin_role_id': None,
-                    'category_id': None,
-                    'log_channel_id': None,
-                    'welcome_message': 'Thank you for creating a ticket! A staff member will be with you shortly.'
-                }
             if 'automod_words' not in data:
                 data['automod_words'] = []
             if 'automod_enabled' not in data:
@@ -42,17 +30,8 @@ def load_data():
             return data
     except (FileNotFoundError, json.JSONDecodeError):
         default_data = {
-            "ticket_counter": 1,
-            "active_tickets": {},
             "stored_embeds": {},
             "embed_counter": 1,
-            "ticket_settings": {
-                "support_role_id": None,
-                "admin_role_id": None,
-                "category_id": None,
-                "log_channel_id": None,
-                "welcome_message": "Thank you for creating a ticket! Please wait patiently while a staff member reviews your request."
-            },
             "automod_words": [],
             "automod_enabled": True
         }
@@ -153,10 +132,7 @@ class EmbedModal(discord.ui.Modal, title="Create Embed"):
             'thumbnail': str(self.thumbnail_input.value) if self.thumbnail_input.value else None,
             'fields': self.embed_data.get('fields', []),
             'image': self.embed_data.get('image'),
-            'author': self.embed_data.get('author'),
-            'has_ticket_system': self.embed_data.get('has_ticket_system', False),
-            'ticket_button_text': self.embed_data.get('ticket_button_text', 'Create Ticket'),
-            'ticket_category_id': self.embed_data.get('ticket_category_id')
+            'author': self.embed_data.get('author')
         }
 
         view = EmbedOptionsView(embed_data, self.editing_embed_id)
@@ -217,42 +193,6 @@ class FieldModal(discord.ui.Modal, title="Add Field"):
         view = EmbedOptionsView(self.embed_data)
         await interaction.response.send_message("Field added! Continue editing:", view=view, ephemeral=True)
 
-class TicketModal(discord.ui.Modal, title="Ticket System Settings"):
-    def __init__(self, embed_data):
-        super().__init__()
-        self.embed_data = embed_data
-
-        self.button_text.default = embed_data.get('ticket_button_text', 'Create Ticket')
-
-    button_text = discord.ui.TextInput(
-        label="Ticket Button Text",
-        placeholder="Create Ticket",
-        max_length=80,
-        required=False
-    )
-
-    category_id = discord.ui.TextInput(
-        label="Category ID (optional)",
-        placeholder="Right-click category > Copy ID",
-        max_length=20,
-        required=False
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        self.embed_data['has_ticket_system'] = True
-        self.embed_data['ticket_button_text'] = str(self.button_text.value) if self.button_text.value else 'Create Ticket'
-
-        if self.category_id.value:
-            try:
-                self.embed_data['ticket_category_id'] = int(self.category_id.value)
-            except ValueError:
-                pass
-
-        view = EmbedOptionsView(self.embed_data)
-        await interaction.response.send_message("Ticket system configured! Continue editing:", view=view, ephemeral=True)
-
-
-
 class EmbedOptionsView(discord.ui.View):
     def __init__(self, embed_data, editing_embed_id=None):
         super().__init__(timeout=300)
@@ -270,7 +210,7 @@ class EmbedOptionsView(discord.ui.View):
         if not fields:
             await interaction.response.send_message("No fields to manage! Add a field first.", ephemeral=True)
             return
-        
+
         view = FieldManagerView(self.embed_data, self.editing_embed_id)
         await interaction.response.send_message("**Field Manager:**\nSelect a field to edit or delete:", view=view, ephemeral=True)
 
@@ -284,21 +224,10 @@ class EmbedOptionsView(discord.ui.View):
         modal = AuthorModal(self.embed_data)
         await interaction.response.send_modal(modal)
 
-    @discord.ui.button(label="Ticket System", style=discord.ButtonStyle.green, emoji="🎫")
-    async def add_ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = TicketModal(self.embed_data)
-        await interaction.response.send_modal(modal)
-
     @discord.ui.button(label="Preview", style=discord.ButtonStyle.secondary, emoji="👁️")
     async def preview_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = create_embed_from_data(self.embed_data)
-        view = None
-
-        if self.embed_data.get('has_ticket_system'):
-            button_text = self.embed_data.get('ticket_button_text', 'Create Ticket')
-            view = TicketView(button_text)
-
-        await interaction.response.send_message("**Preview:**", embed=embed, view=view, ephemeral=True)
+        await interaction.response.send_message("**Preview:**", embed=embed, ephemeral=True)
 
     @discord.ui.button(label="Save Changes", style=discord.ButtonStyle.primary, emoji="💾")
     async def save_changes(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -325,11 +254,6 @@ class EmbedOptionsView(discord.ui.View):
     @discord.ui.button(label="Send Embed", style=discord.ButtonStyle.success, emoji="✅")
     async def send_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
         embed = create_embed_from_data(self.embed_data)
-        view = None
-
-        if self.embed_data.get('has_ticket_system'):
-            button_text = self.embed_data.get('ticket_button_text', 'Create Ticket')
-            view = TicketView(button_text)
 
         # Save embed if not already saved
         data = load_data()
@@ -351,7 +275,7 @@ class EmbedOptionsView(discord.ui.View):
         save_data(data)
 
         await interaction.response.send_message(f"Embed {action_text}! (ID: {embed_id})", ephemeral=True)
-        await interaction.followup.send(embed=embed, view=view)
+        await interaction.followup.send(embed=embed)
 
 class ImageModal(discord.ui.Modal, title="Add Image"):
     def __init__(self, embed_data):
@@ -403,218 +327,6 @@ class AuthorModal(discord.ui.Modal, title="Add Author"):
         view = EmbedOptionsView(self.embed_data)
         await interaction.response.send_message("Author added! Continue editing:", view=view, ephemeral=True)
 
-class TicketView(discord.ui.View):
-    def __init__(self, button_text="Create Ticket"):
-        super().__init__(timeout=None)
-        self.button_text = button_text
-        # Update the button label after initialization
-        for item in self.children:
-            if hasattr(item, 'label'):
-                item.label = button_text
-
-    @discord.ui.button(label="Create Ticket", style=discord.ButtonStyle.primary, emoji="🎫")
-    async def create_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-
-        # Check if user already has a ticket
-        user_id = str(interaction.user.id)
-        if user_id in data['active_tickets']:
-            await interaction.response.send_message("You already have an active ticket!", ephemeral=True)
-            return
-
-        # Create ticket channel
-        guild = interaction.guild
-        category = None
-
-        # Use configured category or create default
-        if data['ticket_settings'].get('category_id'):
-            category = guild.get_channel(data['ticket_settings']['category_id'])
-
-        if not category:
-            for cat in guild.categories:
-                if cat.name.lower() == "tickets":
-                    category = cat
-                    break
-
-        if not category:
-            category = await guild.create_category("Tickets")
-
-        # Create channel with proper permissions
-        channel_name = f"ticket-{data['ticket_counter']}"
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
-        }
-
-        # Add support role permissions if configured
-        if data['ticket_settings'].get('support_role_id'):
-            support_role = guild.get_role(data['ticket_settings']['support_role_id'])
-            if support_role:
-                overwrites[support_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
-
-        # Add admin role permissions if configured
-        if data['ticket_settings'].get('admin_role_id'):
-            admin_role = guild.get_role(data['ticket_settings']['admin_role_id'])
-            if admin_role:
-                overwrites[admin_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
-
-        ticket_channel = await guild.create_text_channel(
-            channel_name,
-            category=category,
-            overwrites=overwrites
-        )
-
-        # Create ticket embed
-        embed = discord.Embed(
-            title="🎫 Support Ticket",
-            description=f"Hello {interaction.user.mention}!\n\n**Please wait** - A staff member will be with you shortly.\n\n{data['ticket_settings']['welcome_message']}\n\n**Ticket ID:** {data['ticket_counter']}",
-            color=0x00ff00,
-            timestamp=datetime.now()
-        )
-        embed.add_field(
-            name="🕐 What happens next?",
-            value="• This is your **private ticket channel**\n• Only you and staff can see this\n• Please **wait patiently** for a response\n• Describe your issue in detail",
-            inline=False
-        )
-        embed.set_footer(text=f"Ticket created by {interaction.user}")
-
-        close_view = TicketCloseView(user_id, data['ticket_counter'])
-        await ticket_channel.send(embed=embed, view=close_view)
-
-        # Update data
-        data['active_tickets'][user_id] = {
-            'channel_id': ticket_channel.id,
-            'ticket_id': data['ticket_counter'],
-            'created_at': datetime.now().isoformat()
-        }
-        data['ticket_counter'] += 1
-        save_data(data)
-
-        # Log ticket creation
-        if data['ticket_settings'].get('log_channel_id'):
-            log_channel = guild.get_channel(data['ticket_settings']['log_channel_id'])
-            if log_channel:
-                log_embed = discord.Embed(
-                    title="📊 Ticket Created",
-                    description=f"**User:** {interaction.user.mention}\n**Channel:** {ticket_channel.mention}\n**ID:** {data['ticket_counter'] - 1}",
-                    color=0x00ff00,
-                    timestamp=datetime.now()
-                )
-                await log_channel.send(embed=log_embed)
-
-        try:
-            await interaction.response.send_message(f"Ticket created! {ticket_channel.mention}", ephemeral=True)
-        except discord.NotFound:
-            # Interaction expired, but ticket was still created successfully
-            pass
-
-class TicketCloseView(discord.ui.View):
-    def __init__(self, user_id, ticket_id):
-        super().__init__(timeout=None)
-        self.user_id = user_id
-        self.ticket_id = ticket_id
-
-    @discord.ui.button(label="Close Ticket", style=discord.ButtonStyle.danger, emoji="🔒")
-    async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-
-        # Log ticket closure
-        guild = interaction.guild
-        if data['ticket_settings'].get('log_channel_id'):
-            log_channel = guild.get_channel(data['ticket_settings']['log_channel_id'])
-            if log_channel:
-                log_embed = discord.Embed(
-                    title="📊 Ticket Closed",
-                    description=f"**Closed by:** {interaction.user.mention}\n**Channel:** {interaction.channel.mention}\n**ID:** {self.ticket_id}",
-                    color=0xff0000,
-                    timestamp=datetime.now()
-                )
-                await log_channel.send(embed=log_embed)
-
-        # Remove from active tickets
-        if self.user_id in data['active_tickets']:
-            del data['active_tickets'][self.user_id]
-            save_data(data)
-
-        embed = discord.Embed(
-            title="🔒 Ticket Closed",
-            description="This ticket will be deleted in 5 seconds.",
-            color=0xff0000
-        )
-
-        await interaction.response.send_message(embed=embed)
-        await asyncio.sleep(5)
-        await interaction.channel.delete()
-
-    @discord.ui.button(label="Add User", style=discord.ButtonStyle.secondary, emoji="➕")
-    async def add_user(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = AddUserModal(interaction.channel)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Remove User", style=discord.ButtonStyle.secondary, emoji="➖")
-    async def remove_user(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = RemoveUserModal(interaction.channel)
-        await interaction.response.send_modal(modal)
-
-class AddUserModal(discord.ui.Modal, title="Add User to Ticket"):
-    def __init__(self, channel):
-        super().__init__()
-        self.channel = channel
-
-    user_input = discord.ui.TextInput(
-        label="User ID or Mention",
-        placeholder="@user or 123456789012345678",
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            user_id = self.user_input.value.strip()
-            if user_id.startswith('<@') and user_id.endswith('>'):
-                user_id = user_id[2:-1]
-                if user_id.startswith('!'):
-                    user_id = user_id[1:]
-
-            user = interaction.guild.get_member(int(user_id))
-            if user:
-                await self.channel.set_permissions(user, read_messages=True, send_messages=True)
-                await interaction.response.send_message(f"✅ Added {user.mention} to the ticket!", ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ User not found!", ephemeral=True)
-        except ValueError:
-            await interaction.response.send_message("❌ Invalid user ID!", ephemeral=True)
-
-class RemoveUserModal(discord.ui.Modal, title="Remove User from Ticket"):
-    def __init__(self, channel):
-        super().__init__()
-        self.channel = channel
-
-    user_input = discord.ui.TextInput(
-        label="User ID or Mention",
-        placeholder="@user or 123456789012345678",
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            user_id = self.user_input.value.strip()
-            if user_id.startswith('<@') and user_id.endswith('>'):
-                user_id = user_id[2:-1]
-                if user_id.startswith('!'):
-                    user_id = user_id[1:]
-
-            user = interaction.guild.get_member(int(user_id))
-            if user:
-                await self.channel.set_permissions(user, overwrite=None)
-                await interaction.response.send_message(f"✅ Removed {user.mention} from the ticket!", ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ User not found!", ephemeral=True)
-        except ValueError:
-            await interaction.response.send_message("❌ Invalid user ID!", ephemeral=True)
-
-
-
 def create_embed_from_data(embed_data):
     embed = discord.Embed()
 
@@ -663,7 +375,7 @@ class FieldManagerView(discord.ui.View):
         super().__init__(timeout=300)
         self.embed_data = embed_data
         self.editing_embed_id = editing_embed_id
-        
+
         # Create select menu for fields
         fields = embed_data.get('fields', [])
         options = []
@@ -673,13 +385,13 @@ class FieldManagerView(discord.ui.View):
             # Truncate for display
             if len(field_value) > 50:
                 field_value = field_value[:47] + "..."
-            
+
             options.append(discord.SelectOption(
                 label=f"{i+1}. {field_name}"[:100],
                 value=str(i),
                 description=field_value[:100] if field_value else "No value"
             ))
-        
+
         if options:
             self.select_field.options = options[:25]
         else:
@@ -690,7 +402,7 @@ class FieldManagerView(discord.ui.View):
     async def select_field(self, interaction: discord.Interaction, select: discord.ui.Select):
         field_index = int(select.values[0])
         self.selected_field_index = field_index
-        
+
         field = self.embed_data['fields'][field_index]
         embed = discord.Embed(
             title=f"📝 Field {field_index + 1}",
@@ -699,7 +411,7 @@ class FieldManagerView(discord.ui.View):
         embed.add_field(name="Name", value=field.get('name', 'No name'), inline=False)
         embed.add_field(name="Value", value=field.get('value', 'No value'), inline=False)
         embed.add_field(name="Inline", value=str(field.get('inline', False)), inline=False)
-        
+
         await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
 
     @discord.ui.button(label="Edit Selected Field", style=discord.ButtonStyle.primary, emoji="✏️")
@@ -707,7 +419,7 @@ class FieldManagerView(discord.ui.View):
         if not hasattr(self, 'selected_field_index'):
             await interaction.response.send_message("❌ Please select a field first!", ephemeral=True)
             return
-        
+
         modal = FieldModal(self.embed_data, self.selected_field_index)
         await interaction.response.send_modal(modal)
 
@@ -716,10 +428,10 @@ class FieldManagerView(discord.ui.View):
         if not hasattr(self, 'selected_field_index'):
             await interaction.response.send_message("❌ Please select a field first!", ephemeral=True)
             return
-        
+
         field_name = self.embed_data['fields'][self.selected_field_index].get('name', f'Field {self.selected_field_index + 1}')
         del self.embed_data['fields'][self.selected_field_index]
-        
+
         view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
         await interaction.response.send_message(f"✅ Deleted field '{field_name}'. Continue editing:", view=view, ephemeral=True)
 
@@ -766,7 +478,6 @@ class EmbedSelectView(discord.ui.View):
             color=0x0099ff
         )
         info_embed.add_field(name="Title", value=embed_data.get('title', 'No title'), inline=True)
-        info_embed.add_field(name="Has Ticket System", value="Yes" if embed_data.get('has_ticket_system') else "No", inline=True)
         info_embed.add_field(name="Fields Count", value=len(embed_data.get('fields', [])), inline=True)
 
         await interaction.response.send_message(embeds=[info_embed, preview_embed], view=self, ephemeral=True)
@@ -821,17 +532,9 @@ class SpawnEmbedSelectView(discord.ui.View):
 
         # Create the embed
         embed = create_embed_from_data(embed_data)
-        view = None
-
-        if embed_data.get('has_ticket_system'):
-            button_text = embed_data.get('ticket_button_text', 'Create Ticket')
-            view = TicketView(button_text)
 
         # Send the embed to the channel
-        if view is not None:
-            await interaction.response.send_message(embed=embed, view=view)
-        else:
-            await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
 class EditEmbedSelectView(discord.ui.View):
     def __init__(self, stored_embeds):
@@ -864,316 +567,7 @@ class EditEmbedSelectView(discord.ui.View):
         modal = EmbedModal(embed_data, embed_id)
         await interaction.response.send_modal(modal)
 
-# Slash Commands
-@bot.tree.command(name="create_embed", description="Create a custom embed message")
-async def create_embed(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        modal = EmbedModal()
-        await interaction.response.send_modal(modal)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in create_embed: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="edit_embed", description="Edit an existing embed")
-async def edit_embed(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-
-        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
-            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
-            return
-
-        view = EditEmbedSelectView(data['stored_embeds'])
-        await interaction.response.send_message(f"**Select Embed to Edit ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in edit_embed: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="list_embeds", description="List all stored embeds")
-async def list_embeds(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-
-        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
-            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one.", ephemeral=True)
-            return
-
-        # Create summary embed
-        summary_embed = discord.Embed(
-            title="📋 Stored Embeds Summary",
-            description=f"Total embeds: **{len(data['stored_embeds'])}**",
-            color=0x0099ff
-        )
-        
-        # Add quick summary of each embed
-        for embed_id, embed_data in list(data['stored_embeds'].items())[:10]:  # Limit to first 10
-            title = embed_data.get('title', 'No title')
-            field_count = len(embed_data.get('fields', []))
-            has_ticket = "🎫" if embed_data.get('has_ticket_system') else ""
-            
-            summary_embed.add_field(
-                name=f"{embed_id} {has_ticket}",
-                value=f"**Title:** {title[:50]}{'...' if len(title) > 50 else ''}\n**Fields:** {field_count}",
-                inline=True
-            )
-        
-        if len(data['stored_embeds']) > 10:
-            summary_embed.set_footer(text=f"Showing first 10 of {len(data['stored_embeds'])} embeds. Use the dropdown to see all.")
-
-        view = EmbedSelectView(data['stored_embeds'])
-        await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in list_embeds: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="spawnembed", description="Spawn a stored embed message")
-async def spawn_embed(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-
-        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
-            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
-            return
-
-        view = SpawnEmbedSelectView(data['stored_embeds'])
-        await interaction.response.send_message(f"**Select Embed to Spawn ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore
-        pass
-    except Exception as e:
-        print(f"Error in spawn_embed: {e}")
-
-@bot.tree.command(name="delete_embed", description="Delete a stored embed message")
-async def delete_embed(interaction: discord.Interaction, embed_id: str):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-
-        if embed_id not in data['stored_embeds']:
-            await interaction.response.send_message(f"❌ Embed '{embed_id}' not found!", ephemeral=True)
-            return
-
-        # Get embed title for confirmation message
-        embed_title = data['stored_embeds'][embed_id].get('title', 'Untitled')
-
-        # Delete the embed
-        del data['stored_embeds'][embed_id]
-        save_data(data)
-
-        await interaction.response.send_message(f"✅ Successfully deleted embed '{embed_id}' ({embed_title})", ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in delete_embed: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-
-
-@bot.tree.command(name="ticket_config", description="Ticket system editor - view and edit all ticket systems")
-async def ticket_config(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-        
-        # Find all embeds with ticket systems
-        ticket_embeds = {embed_id: embed_data for embed_id, embed_data in data.get('stored_embeds', {}).items() 
-                        if embed_data.get('has_ticket_system')}
-
-        if not ticket_embeds:
-            await interaction.response.send_message("🎫 No ticket systems found! Create an embed with a ticket system first using `/create_embed`.", ephemeral=True)
-            return
-
-        # Create summary embed
-        summary_embed = discord.Embed(
-            title="🎫 Ticket System Editor",
-            description=f"**Active Ticket Systems:** {len(ticket_embeds)}\n**Global Settings Available**",
-            color=0x0099ff,
-            timestamp=datetime.now()
-        )
-        
-        # Show global settings
-        settings = data.get('ticket_settings', {})
-        support_role = interaction.guild.get_role(settings.get('support_role_id')) if settings.get('support_role_id') else None
-        admin_role = interaction.guild.get_role(settings.get('admin_role_id')) if settings.get('admin_role_id') else None
-        category = interaction.guild.get_channel(settings.get('category_id')) if settings.get('category_id') else None
-        log_channel = interaction.guild.get_channel(settings.get('log_channel_id')) if settings.get('log_channel_id') else None
-        
-        global_settings = f"**Support Role:** {support_role.mention if support_role else 'Not set'}\n"
-        global_settings += f"**Admin Role:** {admin_role.mention if admin_role else 'Not set'}\n"
-        global_settings += f"**Category:** {category.mention if category else 'Auto-create'}\n"
-        global_settings += f"**Log Channel:** {log_channel.mention if log_channel else 'Not set'}"
-        
-        summary_embed.add_field(name="🌐 Global Settings", value=global_settings, inline=False)
-        
-        # Show ticket system embeds
-        for embed_id, embed_data in list(ticket_embeds.items())[:5]:  # Show first 5
-            title = embed_data.get('title', 'Untitled Embed')
-            button_text = embed_data.get('ticket_button_text', 'Create Ticket')
-            
-            summary_embed.add_field(
-                name=f"🎫 {embed_id}",
-                value=f"**Title:** {title[:30]}{'...' if len(title) > 30 else ''}\n**Button:** {button_text}",
-                inline=True
-            )
-        
-        if len(ticket_embeds) > 5:
-            summary_embed.set_footer(text=f"Showing 5 of {len(ticket_embeds)} ticket systems. Use dropdown to see all.")
-
-        view = TicketSystemEditorView(ticket_embeds, data['ticket_settings'])
-        await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in ticket_config: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="automod", description="Manage auto-moderation settings")
-async def automod(interaction: discord.Interaction, action: str, word: str = None):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-
-        if action.lower() == "add" and word:
-            if word.lower() not in [w.lower() for w in data['automod_words']]:
-                data['automod_words'].append(word)
-                save_data(data)
-                await interaction.response.send_message(f"✅ Added '{word}' to auto-mod list", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"❌ '{word}' is already in the auto-mod list", ephemeral=True)
-
-        elif action.lower() == "remove" and word:
-            original_length = len(data['automod_words'])
-            data['automod_words'] = [w for w in data['automod_words'] if w.lower() != word.lower()]
-            if len(data['automod_words']) < original_length:
-                save_data(data)
-                await interaction.response.send_message(f"✅ Removed '{word}' from auto-mod list", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"❌ '{word}' was not found in the auto-mod list", ephemeral=True)
-
-        elif action.lower() == "list":
-            if data['automod_words']:
-                word_list = "\n".join([f"• {word}" for word in data['automod_words']])
-                embed = discord.Embed(
-                    title="🛡️ Auto-Mod Word List",
-                    description=word_list,
-                    color=0xff0000
-                )
-            else:
-                embed = discord.Embed(
-                    title="🛡️ Auto-Mod Word List",
-                    description="No words in the auto-mod list",
-                    color=0xff0000
-                )
-            embed.add_field(name="Status", value="Enabled" if data['automod_enabled'] else "Disabled", inline=True)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-
-        elif action.lower() == "toggle":
-            data['automod_enabled'] = not data['automod_enabled']
-            save_data(data)
-            status = "enabled" if data['automod_enabled'] else "disabled"
-            await interaction.response.send_message(f"✅ Auto-moderation {status}", ephemeral=True)
-
-        else:
-            await interaction.response.send_message("❌ Invalid action! Use: add, remove, list, or toggle", ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in automod: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="ticket_list", description="List all active tickets")
-async def ticket_list(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-
-        if not data['active_tickets']:
-            await interaction.response.send_message("No active tickets!", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="🎫 Active Tickets",
-            color=0x0099ff
-        )
-
-        for user_id, ticket_info in data['active_tickets'].items():
-            user = interaction.guild.get_member(int(user_id))
-            channel = interaction.guild.get_channel(ticket_info['channel_id'])
-
-            if user and channel:
-                embed.add_field(
-                    name=f"Ticket #{ticket_info['ticket_id']}",
-                    value=f"**User:** {user.mention}\n**Channel:** {channel.mention}\n**Created:** {ticket_info['created_at'][:10]}",
-                    inline=True
-                )
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in ticket_list: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
+# Application System Classes and Commands
 
 class ApplicationCreateModal(discord.ui.Modal, title="Create Application Panel"):
     def __init__(self):
@@ -1217,7 +611,7 @@ class ApplicationCreateModal(discord.ui.Modal, title="Create Application Panel")
 
     async def on_submit(self, interaction: discord.Interaction):
         data = load_data()
-        
+
         # Initialize custom applications if not exists
         if 'custom_applications' not in data:
             data['custom_applications'] = {}
@@ -1225,7 +619,7 @@ class ApplicationCreateModal(discord.ui.Modal, title="Create Application Panel")
             data['app_panel_counter'] = 1
 
         app_id = f"app_panel_{data['app_panel_counter']}"
-        
+
         app_panel_data = {
             'name': str(self.app_name.value),
             'description': str(self.app_description.value),
@@ -1287,7 +681,7 @@ class ApplicationFieldModal(discord.ui.Modal, title="Add Application Field"):
 
     async def on_submit(self, interaction: discord.Interaction):
         data = load_data()
-        
+
         if self.app_id not in data.get('custom_applications', {}):
             await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
             return
@@ -1319,7 +713,7 @@ class ApplicationFieldsView(discord.ui.View):
     async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         app_data = data.get('custom_applications', {}).get(self.app_id)
-        
+
         if not app_data:
             await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
             return
@@ -1335,7 +729,7 @@ class ApplicationFieldsView(discord.ui.View):
     async def preview_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         app_data = data.get('custom_applications', {}).get(self.app_id)
-        
+
         if not app_data:
             await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
             return
@@ -1346,7 +740,7 @@ class ApplicationFieldsView(discord.ui.View):
             color=0x0099ff,
             timestamp=datetime.now()
         )
-        
+
         if app_data.get('fields'):
             field_list = "\n".join([f"• {field['label']} ({'Required' if field['required'] else 'Optional'})" for field in app_data['fields']])
             embed.add_field(name="📝 Application Fields", value=field_list, inline=False)
@@ -1362,7 +756,7 @@ class ApplicationFieldsView(discord.ui.View):
     async def deploy_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         app_data = data.get('custom_applications', {}).get(self.app_id)
-        
+
         if not app_data:
             await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
             return
@@ -1377,23 +771,23 @@ class ApplicationFieldsView(discord.ui.View):
             color=0x0099ff,
             timestamp=datetime.now()
         )
-        
+
         embed.add_field(
             name="📝 How to Apply",
             value=f"Click the **{app_data['button_text']}** button below to start your application.",
             inline=False
         )
-        
+
         field_list = "\n".join([f"• {field['label']}" for field in app_data['fields']])
         embed.add_field(name="📋 Application Fields", value=field_list, inline=False)
-        
+
         embed.set_footer(text="Custom Application System")
 
         if interaction.guild and interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
 
         view = CustomApplicationPanelView(self.app_id)
-        
+
         await interaction.response.send_message(f"✅ Application panel '{app_data['name']}' deployed!", ephemeral=True)
         await interaction.followup.send(embed=embed, view=view)
 
@@ -1401,7 +795,7 @@ class CustomApplicationPanelView(discord.ui.View):
     def __init__(self, app_id):
         super().__init__(timeout=None)
         self.app_id = app_id
-        
+
         # Update button label
         data = load_data()
         app_data = data.get('custom_applications', {}).get(app_id, {})
@@ -1414,7 +808,7 @@ class CustomApplicationPanelView(discord.ui.View):
     async def apply_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
         app_data = data.get('custom_applications', {}).get(self.app_id)
-        
+
         if not app_data:
             await interaction.response.send_message("❌ Application panel not found!", ephemeral=True)
             return
@@ -1422,7 +816,7 @@ class CustomApplicationPanelView(discord.ui.View):
         # Check if user already has a pending application for this panel
         user_applications = [app for app in app_data.get('applications', {}).values() 
                            if app['user_id'] == interaction.user.id and app['status'] == 'pending']
-        
+
         if user_applications:
             await interaction.response.send_message(f"❌ You already have a pending application for {app_data['name']}! Please wait for it to be reviewed.", ephemeral=True)
             return
@@ -1435,7 +829,7 @@ class DynamicApplicationModal(discord.ui.Modal):
         super().__init__(title=f"{app_data['name']} Application")
         self.app_id = app_id
         self.app_data = app_data
-        
+
         # Add fields dynamically
         for i, field in enumerate(app_data.get('fields', [])[:5]):  # Discord limit of 5 components
             text_input = discord.ui.TextInput(
@@ -1450,12 +844,12 @@ class DynamicApplicationModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         data = load_data()
-        
+
         if 'application_counter' not in data:
             data['application_counter'] = 1
 
         application_id = f"app_{data['application_counter']}"
-        
+
         # Collect field responses
         responses = {}
         for i, field in enumerate(self.app_data.get('fields', [])):
@@ -1498,14 +892,14 @@ class DynamicApplicationModal(discord.ui.Modal):
                     color=0x0099ff,
                     timestamp=datetime.now()
                 )
-                
+
                 for field_name, response in responses.items():
                     staff_embed.add_field(
                         name=field_name,
                         value=response[:100] + "..." if len(response) > 100 else response,
                         inline=False
                     )
-                
+
                 review_view = CustomApplicationReviewView(self.app_id, application_id)
                 await staff_channel.send(embed=staff_embed, view=review_view)
 
@@ -1518,7 +912,7 @@ class CustomApplicationReviewView(discord.ui.View):
     @discord.ui.button(label="View Full Application", style=discord.ButtonStyle.primary, emoji="📄")
     async def view_application(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
-        
+
         app_data = data.get('custom_applications', {}).get(self.app_id)
         if not app_data or self.application_id not in app_data.get('applications', {}):
             await interaction.response.send_message("❌ Application not found!", ephemeral=True)
@@ -1533,7 +927,7 @@ class CustomApplicationReviewView(discord.ui.View):
             color=0x0099ff,
             timestamp=datetime.fromisoformat(application['submitted_at'])
         )
-        
+
         embed.add_field(name="👤 Applicant", value=f"{applicant.mention if applicant else 'Unknown User'}", inline=True)
         embed.add_field(name="📊 Status", value=application['status'].title(), inline=True)
 
@@ -1543,7 +937,7 @@ class CustomApplicationReviewView(discord.ui.View):
         if application.get('reviewed_by'):
             reviewer = interaction.guild.get_member(application['reviewed_by'])
             embed.add_field(name="👨‍💼 Reviewed By", value=reviewer.mention if reviewer else "Unknown", inline=True)
-        
+
         if application.get('review_notes'):
             embed.add_field(name="📝 Review Notes", value=application['review_notes'], inline=False)
 
@@ -1579,7 +973,7 @@ class CustomApplicationReviewModal(discord.ui.Modal, title="Review Application")
 
     async def on_submit(self, interaction: discord.Interaction):
         data = load_data()
-        
+
         app_data = data.get('custom_applications', {}).get(self.app_id)
         if not app_data or self.application_id not in app_data.get('applications', {}):
             await interaction.response.send_message("❌ Application not found!", ephemeral=True)
@@ -1598,17 +992,17 @@ class CustomApplicationReviewModal(discord.ui.Modal, title="Review Application")
         if applicant:
             status_color = 0x00ff00 if self.decision == "accepted" else 0xff0000
             status_emoji = "✅" if self.decision == "accepted" else "❌"
-            
+
             dm_embed = discord.Embed(
                 title=f"{status_emoji} {app_data['name']} Application {self.decision.title()}",
                 description=f"Your application for {app_data['name']} has been **{self.decision}**.",
                 color=status_color,
                 timestamp=datetime.now()
             )
-            
+
             if self.review_notes.value:
                 dm_embed.add_field(name="Review Notes", value=self.review_notes.value, inline=False)
-            
+
             dm_embed.set_footer(text="Custom Application System")
 
             try:
@@ -1679,7 +1073,7 @@ class RIAApplicationModal(discord.ui.Modal, title="RIA Application Form"):
             data['ria_application_counter'] = 1
 
         application_id = f"ria_app_{data['ria_application_counter']}"
-        
+
         application_data = {
             'user_id': interaction.user.id,
             'username': str(self.username.value),
@@ -1724,7 +1118,7 @@ class RIAApplicationModal(discord.ui.Modal, title="RIA Application Form"):
                 staff_embed.add_field(name="Username", value=self.username.value, inline=True)
                 staff_embed.add_field(name="Age", value=self.age.value, inline=True)
                 staff_embed.add_field(name="Experience", value=self.experience.value[:100] + "..." if len(self.experience.value) > 100 else self.experience.value, inline=False)
-                
+
                 review_view = RIAApplicationReviewView(application_id)
                 await staff_channel.send(embed=staff_embed, view=review_view)
 
@@ -1736,7 +1130,7 @@ class RIAApplicationReviewView(discord.ui.View):
     @discord.ui.button(label="View Full Application", style=discord.ButtonStyle.primary, emoji="📄")
     async def view_application(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
-        
+
         if self.application_id not in data.get('ria_applications', {}):
             await interaction.response.send_message("❌ Application not found!", ephemeral=True)
             return
@@ -1750,7 +1144,7 @@ class RIAApplicationReviewView(discord.ui.View):
             color=0x0099ff,
             timestamp=datetime.fromisoformat(app_data['submitted_at'])
         )
-        
+
         embed.add_field(name="👤 Applicant", value=f"{applicant.mention if applicant else 'Unknown User'}", inline=True)
         embed.add_field(name="📝 Username", value=app_data['username'], inline=True)
         embed.add_field(name="🎂 Age", value=app_data['age'], inline=True)
@@ -1762,7 +1156,7 @@ class RIAApplicationReviewView(discord.ui.View):
         if app_data.get('reviewed_by'):
             reviewer = interaction.guild.get_member(app_data['reviewed_by'])
             embed.add_field(name="👨‍💼 Reviewed By", value=reviewer.mention if reviewer else "Unknown", inline=True)
-        
+
         if app_data.get('review_notes'):
             embed.add_field(name="📝 Review Notes", value=app_data['review_notes'], inline=False)
 
@@ -1797,7 +1191,7 @@ class RIAReviewModal(discord.ui.Modal, title="Review RIA Application"):
 
     async def on_submit(self, interaction: discord.Interaction):
         data = load_data()
-        
+
         if self.application_id not in data.get('ria_applications', {}):
             await interaction.response.send_message("❌ Application not found!", ephemeral=True)
             return
@@ -1815,17 +1209,17 @@ class RIAReviewModal(discord.ui.Modal, title="Review RIA Application"):
         if applicant:
             status_color = 0x00ff00 if self.decision == "accepted" else 0xff0000
             status_emoji = "✅" if self.decision == "accepted" else "❌"
-            
+
             dm_embed = discord.Embed(
                 title=f"{status_emoji} RIA Application {self.decision.title()}",
                 description=f"Your application to join RIA has been **{self.decision}**.",
                 color=status_color,
                 timestamp=datetime.now()
             )
-            
+
             if self.review_notes.value:
                 dm_embed.add_field(name="Review Notes", value=self.review_notes.value, inline=False)
-            
+
             dm_embed.set_footer(text="RIA Application System")
 
             try:
@@ -1845,340 +1239,6 @@ class RIAReviewModal(discord.ui.Modal, title="Review RIA Application"):
 
         await interaction.response.send_message(f"✅ Application {self.decision}! Applicant has been notified.", ephemeral=True)
 
-class TicketSystemEditorView(discord.ui.View):
-    def __init__(self, ticket_embeds, global_settings):
-        super().__init__(timeout=300)
-        self.ticket_embeds = ticket_embeds
-        self.global_settings = global_settings
-        self.selected_embed_id = None
-
-        # Create select menu for ticket systems
-        options = []
-        for embed_id, embed_data in ticket_embeds.items():
-            title = embed_data.get('title', 'Untitled')
-            button_text = embed_data.get('ticket_button_text', 'Create Ticket')
-            
-            options.append(discord.SelectOption(
-                label=f"{embed_id}: {title}"[:100],
-                value=embed_id,
-                description=f"Button: {button_text}"[:100]
-            ))
-
-        if options:
-            self.select_ticket_system.options = options[:25]
-        else:
-            self.select_ticket_system.disabled = True
-
-    @discord.ui.select(placeholder="Select a ticket system to edit...")
-    async def select_ticket_system(self, interaction: discord.Interaction, select: discord.ui.Select):
-        embed_id = select.values[0]
-        self.selected_embed_id = embed_id
-        embed_data = self.ticket_embeds[embed_id]
-
-        # Show detailed view of selected ticket system
-        detail_embed = discord.Embed(
-            title=f"🎫 Ticket System: {embed_id}",
-            color=0x0099ff
-        )
-        
-        detail_embed.add_field(name="📝 Embed Title", value=embed_data.get('title', 'No title'), inline=False)
-        detail_embed.add_field(name="🔘 Button Text", value=embed_data.get('ticket_button_text', 'Create Ticket'), inline=True)
-        
-        # Check if custom category is set for this embed
-        custom_category = None
-        if embed_data.get('ticket_category_id'):
-            custom_category = interaction.guild.get_channel(embed_data['ticket_category_id'])
-        
-        detail_embed.add_field(
-            name="📁 Category", 
-            value=custom_category.mention if custom_category else "Uses global setting", 
-            inline=True
-        )
-        
-        detail_embed.add_field(name="📊 Status", value="Active", inline=True)
-
-        view = SelectedTicketSystemView(embed_id, embed_data, self.global_settings)
-        await interaction.response.send_message(embed=detail_embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Global Settings", style=discord.ButtonStyle.secondary, emoji="🌐")
-    async def edit_global_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = GlobalTicketSettingsModal(self.global_settings)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Refresh List", style=discord.ButtonStyle.secondary, emoji="🔄")
-    async def refresh_list(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Reload data and refresh the view
-        data = load_data()
-        ticket_embeds = {embed_id: embed_data for embed_id, embed_data in data.get('stored_embeds', {}).items() 
-                        if embed_data.get('has_ticket_system')}
-        
-        self.ticket_embeds = ticket_embeds
-        
-        # Update select options
-        options = []
-        for embed_id, embed_data in ticket_embeds.items():
-            title = embed_data.get('title', 'Untitled')
-            button_text = embed_data.get('ticket_button_text', 'Create Ticket')
-            
-            options.append(discord.SelectOption(
-                label=f"{embed_id}: {title}"[:100],
-                value=embed_id,
-                description=f"Button: {button_text}"[:100]
-            ))
-
-        if options:
-            self.select_ticket_system.options = options[:25]
-            self.select_ticket_system.disabled = False
-        else:
-            self.select_ticket_system.disabled = True
-
-        await interaction.response.send_message(f"🔄 Refreshed! Found {len(ticket_embeds)} ticket systems.", ephemeral=True)
-
-class SelectedTicketSystemView(discord.ui.View):
-    def __init__(self, embed_id, embed_data, global_settings):
-        super().__init__(timeout=300)
-        self.embed_id = embed_id
-        self.embed_data = embed_data
-        self.global_settings = global_settings
-
-    @discord.ui.button(label="Edit Button Text", style=discord.ButtonStyle.primary, emoji="🔘")
-    async def edit_button_text(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = TicketButtonTextModal(self.embed_id, self.embed_data)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Edit Category", style=discord.ButtonStyle.primary, emoji="📁")
-    async def edit_category(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = TicketCategoryModal(self.embed_id, self.embed_data)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Edit Full Embed", style=discord.ButtonStyle.secondary, emoji="📝")
-    async def edit_full_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = EmbedModal(self.embed_data, self.embed_id)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Test Ticket System", style=discord.ButtonStyle.success, emoji="🧪")
-    async def test_ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_embed_from_data(self.embed_data)
-        test_view = TicketView(self.embed_data.get('ticket_button_text', 'Create Ticket'))
-        
-        await interaction.response.send_message("🧪 **Test Preview:**", embed=embed, view=test_view, ephemeral=True)
-
-    @discord.ui.button(label="Remove Ticket System", style=discord.ButtonStyle.danger, emoji="🗑️")
-    async def remove_ticket_system(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-        
-        if self.embed_id in data.get('stored_embeds', {}):
-            # Remove ticket system from embed
-            data['stored_embeds'][self.embed_id]['has_ticket_system'] = False
-            data['stored_embeds'][self.embed_id]['ticket_button_text'] = None
-            data['stored_embeds'][self.embed_id]['ticket_category_id'] = None
-            save_data(data)
-            
-            await interaction.response.send_message(f"✅ Ticket system removed from embed '{self.embed_id}'", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Embed not found!", ephemeral=True)
-
-    @discord.ui.button(label="Back to Overview", style=discord.ButtonStyle.secondary, emoji="↩️")
-    async def back_to_overview(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-        ticket_embeds = {embed_id: embed_data for embed_id, embed_data in data.get('stored_embeds', {}).items() 
-                        if embed_data.get('has_ticket_system')}
-        
-        view = TicketSystemEditorView(ticket_embeds, data['ticket_settings'])
-        
-        summary_embed = discord.Embed(
-            title="🎫 Ticket System Editor",
-            description=f"**Active Ticket Systems:** {len(ticket_embeds)}\n**Global Settings Available**",
-            color=0x0099ff,
-            timestamp=datetime.now()
-        )
-        
-        await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
-
-class GlobalTicketSettingsModal(discord.ui.Modal, title="Global Ticket Settings"):
-    def __init__(self, current_settings):
-        super().__init__()
-        self.current_settings = current_settings
-
-        self.welcome_message.default = current_settings.get('welcome_message', 'Thank you for creating a ticket! A staff member will be with you shortly.')
-
-    support_role_id = discord.ui.TextInput(
-        label="Support Role ID",
-        placeholder="Right-click role > Copy ID",
-        max_length=20,
-        required=False
-    )
-
-    admin_role_id = discord.ui.TextInput(
-        label="Admin Role ID", 
-        placeholder="Right-click role > Copy ID",
-        max_length=20,
-        required=False
-    )
-
-    category_id = discord.ui.TextInput(
-        label="Default Category ID",
-        placeholder="Right-click category > Copy ID",
-        max_length=20,
-        required=False
-    )
-
-    log_channel_id = discord.ui.TextInput(
-        label="Log Channel ID",
-        placeholder="Right-click channel > Copy ID", 
-        max_length=20,
-        required=False
-    )
-
-    welcome_message = discord.ui.TextInput(
-        label="Welcome Message",
-        placeholder="Default welcome message for new tickets...",
-        style=discord.TextStyle.paragraph,
-        max_length=1000,
-        required=False
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        data = load_data()
-
-        if self.support_role_id.value:
-            try:
-                role = interaction.guild.get_role(int(self.support_role_id.value))
-                if role:
-                    data['ticket_settings']['support_role_id'] = role.id
-                else:
-                    await interaction.response.send_message("❌ Support role not found!", ephemeral=True)
-                    return
-            except ValueError:
-                await interaction.response.send_message("❌ Invalid support role ID!", ephemeral=True)
-                return
-
-        if self.admin_role_id.value:
-            try:
-                role = interaction.guild.get_role(int(self.admin_role_id.value))
-                if role:
-                    data['ticket_settings']['admin_role_id'] = role.id
-                else:
-                    await interaction.response.send_message("❌ Admin role not found!", ephemeral=True)
-                    return
-            except ValueError:
-                await interaction.response.send_message("❌ Invalid admin role ID!", ephemeral=True)
-                return
-
-        if self.category_id.value:
-            try:
-                category = interaction.guild.get_channel(int(self.category_id.value))
-                if category and isinstance(category, discord.CategoryChannel):
-                    data['ticket_settings']['category_id'] = category.id
-                else:
-                    await interaction.response.send_message("❌ Category not found or not a category channel!", ephemeral=True)
-                    return
-            except ValueError:
-                await interaction.response.send_message("❌ Invalid category ID!", ephemeral=True)
-                return
-
-        if self.log_channel_id.value:
-            try:
-                channel = interaction.guild.get_channel(int(self.log_channel_id.value))
-                if channel and isinstance(channel, discord.TextChannel):
-                    data['ticket_settings']['log_channel_id'] = channel.id
-                else:
-                    await interaction.response.send_message("❌ Log channel not found or not a text channel!", ephemeral=True)
-                    return
-            except ValueError:
-                await interaction.response.send_message("❌ Invalid log channel ID!", ephemeral=True)
-                return
-
-        if self.welcome_message.value:
-            data['ticket_settings']['welcome_message'] = str(self.welcome_message.value)
-
-        save_data(data)
-
-        # Show updated settings
-        settings = data['ticket_settings']
-        support_role = interaction.guild.get_role(settings.get('support_role_id')) if settings.get('support_role_id') else None
-        admin_role = interaction.guild.get_role(settings.get('admin_role_id')) if settings.get('admin_role_id') else None
-        category = interaction.guild.get_channel(settings.get('category_id')) if settings.get('category_id') else None
-        log_channel = interaction.guild.get_channel(settings.get('log_channel_id')) if settings.get('log_channel_id') else None
-
-        embed = discord.Embed(
-            title="🌐 Global Ticket Settings Updated",
-            color=0x00ff00
-        )
-        embed.add_field(name="Support Role", value=support_role.mention if support_role else "Not set", inline=True)
-        embed.add_field(name="Admin Role", value=admin_role.mention if admin_role else "Not set", inline=True)
-        embed.add_field(name="Default Category", value=category.mention if category else "Auto-create", inline=True)
-        embed.add_field(name="Log Channel", value=log_channel.mention if log_channel else "Not set", inline=True)
-        embed.add_field(name="Welcome Message", value=settings['welcome_message'][:100] + "..." if len(settings['welcome_message']) > 100 else settings['welcome_message'], inline=False)
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-class TicketButtonTextModal(discord.ui.Modal, title="Edit Ticket Button Text"):
-    def __init__(self, embed_id, embed_data):
-        super().__init__()
-        self.embed_id = embed_id
-        self.embed_data = embed_data
-
-        self.button_text.default = embed_data.get('ticket_button_text', 'Create Ticket')
-
-    button_text = discord.ui.TextInput(
-        label="Button Text",
-        placeholder="Create Ticket",
-        max_length=80,
-        required=True
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        data = load_data()
-        
-        if self.embed_id in data.get('stored_embeds', {}):
-            data['stored_embeds'][self.embed_id]['ticket_button_text'] = str(self.button_text.value)
-            save_data(data)
-            
-            await interaction.response.send_message(f"✅ Button text updated to '{self.button_text.value}' for embed '{self.embed_id}'", ephemeral=True)
-        else:
-            await interaction.response.send_message("❌ Embed not found!", ephemeral=True)
-
-class TicketCategoryModal(discord.ui.Modal, title="Edit Ticket Category"):
-    def __init__(self, embed_id, embed_data):
-        super().__init__()
-        self.embed_id = embed_id
-        self.embed_data = embed_data
-
-        if embed_data.get('ticket_category_id'):
-            self.category_id.default = str(embed_data['ticket_category_id'])
-
-    category_id = discord.ui.TextInput(
-        label="Category ID (leave empty for global)",
-        placeholder="Right-click category > Copy ID",
-        max_length=20,
-        required=False
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        data = load_data()
-        
-        if self.embed_id not in data.get('stored_embeds', {}):
-            await interaction.response.send_message("❌ Embed not found!", ephemeral=True)
-            return
-
-        if self.category_id.value:
-            try:
-                category = interaction.guild.get_channel(int(self.category_id.value))
-                if category and isinstance(category, discord.CategoryChannel):
-                    data['stored_embeds'][self.embed_id]['ticket_category_id'] = category.id
-                    save_data(data)
-                    await interaction.response.send_message(f"✅ Ticket category set to {category.mention} for embed '{self.embed_id}'", ephemeral=True)
-                else:
-                    await interaction.response.send_message("❌ Category not found or not a category channel!", ephemeral=True)
-            except ValueError:
-                await interaction.response.send_message("❌ Invalid category ID!", ephemeral=True)
-        else:
-            # Remove custom category (use global)
-            data['stored_embeds'][self.embed_id]['ticket_category_id'] = None
-            save_data(data)
-            await interaction.response.send_message(f"✅ Removed custom category for embed '{self.embed_id}' - will use global setting", ephemeral=True)
-
 class RIAApplicationPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -2186,11 +1246,11 @@ class RIAApplicationPanelView(discord.ui.View):
     @discord.ui.button(label="Apply to Join RIA", style=discord.ButtonStyle.primary, emoji="📝")
     async def apply_to_ria(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
-        
+
         # Check if user already has a pending application
         user_applications = [app for app in data.get('ria_applications', {}).values() 
                            if app['user_id'] == interaction.user.id and app['status'] == 'pending']
-        
+
         if user_applications:
             await interaction.response.send_message("❌ You already have a pending application! Please wait for it to be reviewed.", ephemeral=True)
             return
@@ -2201,38 +1261,241 @@ class RIAApplicationPanelView(discord.ui.View):
     @discord.ui.button(label="Check Application Status", style=discord.ButtonStyle.secondary, emoji="📊")
     async def check_status(self, interaction: discord.Interaction, button: discord.ui.Button):
         data = load_data()
-        
+
         user_applications = [app for app_id, app in data.get('ria_applications', {}).items() 
                            if app['user_id'] == interaction.user.id]
-        
+
         if not user_applications:
             await interaction.response.send_message("❌ You don't have any applications on file.", ephemeral=True)
             return
 
         # Show the most recent application
         latest_app = max(user_applications, key=lambda x: x['submitted_at'])
-        
+
         status_colors = {'pending': 0xffff00, 'accepted': 0x00ff00, 'rejected': 0xff0000}
         status_emoji = {'pending': '⏳', 'accepted': '✅', 'rejected': '❌'}
-        
+
         embed = discord.Embed(
             title="📊 Your RIA Application Status",
             color=status_colors.get(latest_app['status'], 0x0099ff),
             timestamp=datetime.fromisoformat(latest_app['submitted_at'])
         )
-        
+
         embed.add_field(name="Status", value=f"{status_emoji.get(latest_app['status'], '❓')} {latest_app['status'].title()}", inline=True)
         embed.add_field(name="Submitted", value=latest_app['submitted_at'][:10], inline=True)
-        
+
         if latest_app.get('reviewed_at'):
             embed.add_field(name="Reviewed", value=latest_app['reviewed_at'][:10], inline=True)
-        
+
         if latest_app.get('review_notes'):
             embed.add_field(name="Review Notes", value=latest_app['review_notes'], inline=False)
-        
+
         embed.set_footer(text="RIA Application System")
-        
+
         await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# Slash Commands
+@bot.tree.command(name="create_embed", description="Create a custom embed message")
+async def create_embed(interaction: discord.Interaction):
+    try:
+        if interaction.response.is_done():
+            return
+
+        modal = EmbedModal()
+        await interaction.response.send_modal(modal)
+    except discord.NotFound:
+        # Interaction expired, ignore silently
+        pass
+    except Exception as e:
+        print(f"Error in create_embed: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="edit_embed", description="Edit an existing embed")
+async def edit_embed(interaction: discord.Interaction):
+    try:
+        if interaction.response.is_done():
+            return
+
+        data = load_data()
+
+        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
+            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
+            return
+
+        view = EditEmbedSelectView(data['stored_embeds'])
+        await interaction.response.send_message(f"**Select Embed to Edit ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
+    except discord.NotFound:
+        # Interaction expired, ignore silently
+        pass
+    except Exception as e:
+        print(f"Error in edit_embed: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="list_embeds", description="List all stored embeds")
+async def list_embeds(interaction: discord.Interaction):
+    try:
+        if interaction.response.is_done():
+            return
+
+        data = load_data()
+
+        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
+            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one.", ephemeral=True)
+            return
+
+        # Create summary embed
+        summary_embed = discord.Embed(
+            title="📋 Stored Embeds Summary",
+            description=f"Total embeds: **{len(data['stored_embeds'])}**",
+            color=0x0099ff
+        )
+
+        # Add quick summary of each embed
+        for embed_id, embed_data in list(data['stored_embeds'].items())[:10]:  # Limit to first 10
+            title = embed_data.get('title', 'No title')
+            field_count = len(embed_data.get('fields', []))
+
+            summary_embed.add_field(
+                name=f"{embed_id}",
+                value=f"**Title:** {title[:50]}{'...' if len(title) > 50 else ''}\n**Fields:** {field_count}",
+                inline=True
+            )
+
+        if len(data['stored_embeds']) > 10:
+            summary_embed.set_footer(text=f"Showing first 10 of {len(data['stored_embeds'])} embeds. Use the dropdown to see all.")
+
+        view = EmbedSelectView(data['stored_embeds'])
+        await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
+    except discord.NotFound:
+        # Interaction expired, ignore silently
+        pass
+    except Exception as e:
+        print(f"Error in list_embeds: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="spawnembed", description="Spawn a stored embed message")
+async def spawn_embed(interaction: discord.Interaction):
+    try:
+        if interaction.response.is_done():
+            return
+
+        data = load_data()
+
+        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
+            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
+            return
+
+        view = SpawnEmbedSelectView(data['stored_embeds'])
+        await interaction.response.send_message(f"**Select Embed to Spawn ({len(data['stored_embeds'])} available):**", view=view, ephemeral=True)
+    except discord.NotFound:
+        # Interaction expired, ignore
+        pass
+    except Exception as e:
+        print(f"Error in spawn_embed: {e}")
+
+@bot.tree.command(name="delete_embed", description="Delete a stored embed message")
+async def delete_embed(interaction: discord.Interaction, embed_id: str):
+    try:
+        if interaction.response.is_done():
+            return
+
+        data = load_data()
+
+        if embed_id not in data['stored_embeds']:
+            await interaction.response.send_message(f"❌ Embed '{embed_id}' not found!", ephemeral=True)
+            return
+
+        # Get embed title for confirmation message
+        embed_title = data['stored_embeds'][embed_id].get('title', 'Untitled')
+
+        # Delete the embed
+        del data['stored_embeds'][embed_id]
+        save_data(data)
+
+        await interaction.response.send_message(f"✅ Successfully deleted embed '{embed_id}' ({embed_title})", ephemeral=True)
+    except discord.NotFound:
+        # Interaction expired, ignore silently
+        pass
+    except Exception as e:
+        print(f"Error in delete_embed: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="automod", description="Manage auto-moderation settings")
+async def automod(interaction: discord.Interaction, action: str, word: str = None):
+    try:
+        if interaction.response.is_done():
+            return
+
+        data = load_data()
+
+        if action.lower() == "add" and word:
+            if word.lower() not in [w.lower() for w in data['automod_words']]:
+                data['automod_words'].append(word)
+                save_data(data)
+                await interaction.response.send_message(f"✅ Added '{word}' to auto-mod list", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"❌ '{word}' is already in the auto-mod list", ephemeral=True)
+
+        elif action.lower() == "remove" and word:
+            original_length = len(data['automod_words'])
+            data['automod_words'] = [w for w in data['automod_words'] if w.lower() != word.lower()]
+            if len(data['automod_words']) < original_length:
+                save_data(data)
+                await interaction.response.send_message(f"✅ Removed '{word}' from auto-mod list", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"❌ '{word}' was not found in the auto-mod list", ephemeral=True)
+
+        elif action.lower() == "list":
+            if data['automod_words']:
+                word_list = "\n".join([f"• {word}" for word in data['automod_words']])
+                embed = discord.Embed(
+                    title="🛡️ Auto-Mod Word List",
+                    description=word_list,
+                    color=0xff0000
+                )
+            else:
+                embed = discord.Embed(
+                    title="🛡️ Auto-Mod Word List",
+                    description="No words in the auto-mod list",
+                    color=0xff0000
+                )
+            embed.add_field(name="Status", value="Enabled" if data['automod_enabled'] else "Disabled", inline=True)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+
+        elif action.lower() == "toggle":
+            data['automod_enabled'] = not data['automod_enabled']
+            save_data(data)
+            status = "enabled" if data['automod_enabled'] else "disabled"
+            await interaction.response.send_message(f"✅ Auto-moderation {status}", ephemeral=True)
+
+        else:
+            await interaction.response.send_message("❌ Invalid action! Use: add, remove, list, or toggle", ephemeral=True)
+    except discord.NotFound:
+        # Interaction expired, ignore silently
+        pass
+    except Exception as e:
+        print(f"Error in automod: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+        except:
+            pass
 
 @bot.tree.command(name="ria_panel", description="Create the RIA application panel")
 async def ria_panel(interaction: discord.Interaction):
@@ -2246,33 +1509,33 @@ async def ria_panel(interaction: discord.Interaction):
             color=0x0099ff,
             timestamp=datetime.now()
         )
-        
+
         embed.add_field(
             name="📋 How to Apply",
             value="Click the **Apply to Join RIA** button below to start your application process.",
             inline=False
         )
-        
+
         embed.add_field(
             name="📊 Application Process",
             value="1. Fill out the application form\n2. Wait for review by our team\n3. Receive notification of decision",
             inline=False
         )
-        
+
         embed.add_field(
             name="❓ Questions?",
-            value="If you have any questions about the application process, feel free to create a support ticket.",
+            value="If you have any questions about the application process, feel free to reach out to our staff.",
             inline=False
         )
-        
+
         embed.set_footer(text="RIA Recruitment System")
-        
+
         # Check if the interaction is in a guild and has an icon
         if interaction.guild and interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
 
         view = RIAApplicationPanelView()
-        
+
         await interaction.response.send_message("RIA Application Panel created!", ephemeral=True)
         await interaction.followup.send(embed=embed, view=view)
     except discord.NotFound:
@@ -2293,7 +1556,7 @@ async def ria_config(interaction: discord.Interaction, staff_channel: discord.Te
             return
 
         data = load_data()
-        
+
         if 'ria_settings' not in data:
             data['ria_settings'] = {}
 
@@ -2382,13 +1645,13 @@ async def ria_applications(interaction: discord.Interaction, status: str = None)
 
         # Show recent applications
         recent_apps = sorted(applications.items(), key=lambda x: x[1]['submitted_at'], reverse=True)[:5]
-        
+
         for app_id, app_data in recent_apps:
             applicant = interaction.guild.get_member(app_data['user_id'])
             applicant_name = applicant.display_name if applicant else "Unknown User"
-            
+
             status_emoji = {'pending': '⏳', 'accepted': '✅', 'rejected': '❌'}
-            
+
             embed.add_field(
                 name=f"{status_emoji.get(app_data['status'], '❓')} {app_id}",
                 value=f"**Applicant:** {applicant_name}\n**Status:** {app_data['status'].title()}\n**Submitted:** {app_data['submitted_at'][:10]}",
@@ -2409,375 +1672,6 @@ async def ria_applications(interaction: discord.Interaction, status: str = None)
                 await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
         except:
             pass
-
-@bot.tree.command(name="ticketedit", description="Comprehensive ticket system editor - configure everything")
-async def ticket_edit(interaction: discord.Interaction):
-    try:
-        if interaction.response.is_done():
-            return
-
-        data = load_data()
-        
-        # Create main configuration embed
-        embed = discord.Embed(
-            title="🎫 Ticket System Configuration",
-            description="Complete ticket system setup and management center",
-            color=0x0099ff,
-            timestamp=datetime.now()
-        )
-        
-        # Show current global settings
-        settings = data.get('ticket_settings', {})
-        support_role = interaction.guild.get_role(settings.get('support_role_id')) if settings.get('support_role_id') else None
-        admin_role = interaction.guild.get_role(settings.get('admin_role_id')) if settings.get('admin_role_id') else None
-        category = interaction.guild.get_channel(settings.get('category_id')) if settings.get('category_id') else None
-        log_channel = interaction.guild.get_channel(settings.get('log_channel_id')) if settings.get('log_channel_id') else None
-        
-        global_settings = f"**Support Role:** {support_role.mention if support_role else '❌ Not set'}\n"
-        global_settings += f"**Admin Role:** {admin_role.mention if admin_role else '❌ Not set'}\n"
-        global_settings += f"**Default Category:** {category.mention if category else '⚠️ Auto-create'}\n"
-        global_settings += f"**Log Channel:** {log_channel.mention if log_channel else '❌ Not set'}"
-        
-        embed.add_field(name="🌐 Global Settings", value=global_settings, inline=False)
-        
-        # Show ticket systems count
-        ticket_embeds = {embed_id: embed_data for embed_id, embed_data in data.get('stored_embeds', {}).items() 
-                        if embed_data.get('has_ticket_system')}
-        
-        embed.add_field(
-            name="🎫 Active Ticket Systems", 
-            value=f"**{len(ticket_embeds)}** ticket systems configured\n**{len(data.get('active_tickets', {}))}** active tickets", 
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📋 Welcome Message Preview", 
-            value=f"```{settings.get('welcome_message', 'Default message')[:100]}{'...' if len(settings.get('welcome_message', '')) > 100 else ''}```", 
-            inline=False
-        )
-        
-        embed.set_footer(text="Use the buttons below to configure your ticket system")
-
-        view = TicketEditMainView()
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-    except discord.NotFound:
-        # Interaction expired, ignore silently
-        pass
-    except Exception as e:
-        print(f"Error in ticket_edit: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-class TicketEditMainView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label="Global Settings", style=discord.ButtonStyle.primary, emoji="🌐")
-    async def global_settings(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-        modal = ComprehensiveTicketSettingsModal(data.get('ticket_settings', {}))
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Manage Ticket Panels", style=discord.ButtonStyle.secondary, emoji="📋")
-    async def manage_panels(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-        ticket_embeds = {embed_id: embed_data for embed_id, embed_data in data.get('stored_embeds', {}).items() 
-                        if embed_data.get('has_ticket_system')}
-
-        if not ticket_embeds:
-            await interaction.response.send_message("🎫 No ticket systems found! Create an embed with a ticket system first using `/create_embed`.", ephemeral=True)
-            return
-
-        view = TicketSystemEditorView(ticket_embeds, data['ticket_settings'])
-        
-        summary_embed = discord.Embed(
-            title="🎫 Ticket System Manager",
-            description=f"**Active Ticket Systems:** {len(ticket_embeds)}",
-            color=0x0099ff
-        )
-        
-        # Show ticket system embeds
-        for embed_id, embed_data in list(ticket_embeds.items())[:5]:
-            title = embed_data.get('title', 'Untitled Embed')
-            button_text = embed_data.get('ticket_button_text', 'Create Ticket')
-            
-            summary_embed.add_field(
-                name=f"🎫 {embed_id}",
-                value=f"**Title:** {title[:30]}{'...' if len(title) > 30 else ''}\n**Button:** {button_text}",
-                inline=True
-            )
-        
-        await interaction.response.send_message(embed=summary_embed, view=view, ephemeral=True)
-
-    @discord.ui.button(label="Create New Ticket Panel", style=discord.ButtonStyle.success, emoji="➕")
-    async def create_panel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = QuickTicketPanelModal()
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="View Active Tickets", style=discord.ButtonStyle.secondary, emoji="📊")
-    async def view_tickets(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
-
-        if not data.get('active_tickets'):
-            await interaction.response.send_message("📊 No active tickets!", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="🎫 Active Tickets Overview",
-            description=f"**Total Active:** {len(data['active_tickets'])}",
-            color=0x0099ff,
-            timestamp=datetime.now()
-        )
-
-        for user_id, ticket_info in list(data['active_tickets'].items())[:10]:  # Show first 10
-            user = interaction.guild.get_member(int(user_id))
-            channel = interaction.guild.get_channel(ticket_info['channel_id'])
-
-            if user and channel:
-                embed.add_field(
-                    name=f"🎫 Ticket #{ticket_info['ticket_id']}",
-                    value=f"**User:** {user.mention}\n**Channel:** {channel.mention}\n**Created:** {ticket_info['created_at'][:10]}",
-                    inline=True
-                )
-
-        if len(data['active_tickets']) > 10:
-            embed.set_footer(text=f"Showing 10 of {len(data['active_tickets'])} active tickets")
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="Test Ticket Creation", style=discord.ButtonStyle.green, emoji="🧪")
-    async def test_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
-            title="🧪 Test Ticket Panel",
-            description="This is a test ticket panel to verify your configuration works correctly.",
-            color=0x00ff00
-        )
-        
-        embed.add_field(
-            name="📋 Instructions",
-            value="Click the button below to test ticket creation with your current settings.",
-            inline=False
-        )
-        
-        view = TicketView("🧪 Test Ticket")
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-class ComprehensiveTicketSettingsModal(discord.ui.Modal, title="Complete Ticket System Settings"):
-    def __init__(self, current_settings):
-        super().__init__()
-        self.current_settings = current_settings
-
-        # Pre-fill with current values
-        if current_settings.get('support_role_id'):
-            self.support_role_id.default = str(current_settings['support_role_id'])
-        if current_settings.get('admin_role_id'):
-            self.admin_role_id.default = str(current_settings['admin_role_id'])
-        if current_settings.get('category_id'):
-            self.category_id.default = str(current_settings['category_id'])
-        if current_settings.get('log_channel_id'):
-            self.log_channel_id.default = str(current_settings['log_channel_id'])
-        self.welcome_message.default = current_settings.get('welcome_message', 'Thank you for creating a ticket! A staff member will be with you shortly.')
-
-    support_role_id = discord.ui.TextInput(
-        label="Support Role ID",
-        placeholder="Right-click role > Copy ID (staff who can view tickets)",
-        max_length=20,
-        required=False
-    )
-
-    admin_role_id = discord.ui.TextInput(
-        label="Admin Role ID", 
-        placeholder="Right-click role > Copy ID (can manage & close tickets)",
-        max_length=20,
-        required=False
-    )
-
-    category_id = discord.ui.TextInput(
-        label="Ticket Category ID",
-        placeholder="Right-click category > Copy ID (where tickets are created)",
-        max_length=20,
-        required=False
-    )
-
-    log_channel_id = discord.ui.TextInput(
-        label="Log Channel ID",
-        placeholder="Right-click channel > Copy ID (ticket activity logs)", 
-        max_length=20,
-        required=False
-    )
-
-    welcome_message = discord.ui.TextInput(
-        label="Welcome Message",
-        placeholder="Message shown when tickets are created...",
-        style=discord.TextStyle.paragraph,
-        max_length=1000,
-        required=False
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        data = load_data()
-        errors = []
-
-        # Validate and set support role
-        if self.support_role_id.value:
-            try:
-                role = interaction.guild.get_role(int(self.support_role_id.value))
-                if role:
-                    data['ticket_settings']['support_role_id'] = role.id
-                else:
-                    errors.append("Support role not found")
-            except ValueError:
-                errors.append("Invalid support role ID")
-
-        # Validate and set admin role
-        if self.admin_role_id.value:
-            try:
-                role = interaction.guild.get_role(int(self.admin_role_id.value))
-                if role:
-                    data['ticket_settings']['admin_role_id'] = role.id
-                else:
-                    errors.append("Admin role not found")
-            except ValueError:
-                errors.append("Invalid admin role ID")
-
-        # Validate and set category
-        if self.category_id.value:
-            try:
-                category = interaction.guild.get_channel(int(self.category_id.value))
-                if category and isinstance(category, discord.CategoryChannel):
-                    data['ticket_settings']['category_id'] = category.id
-                else:
-                    errors.append("Category not found or not a category channel")
-            except ValueError:
-                errors.append("Invalid category ID")
-
-        # Validate and set log channel
-        if self.log_channel_id.value:
-            try:
-                channel = interaction.guild.get_channel(int(self.log_channel_id.value))
-                if channel and isinstance(channel, discord.TextChannel):
-                    data['ticket_settings']['log_channel_id'] = channel.id
-                else:
-                    errors.append("Log channel not found or not a text channel")
-            except ValueError:
-                errors.append("Invalid log channel ID")
-
-        # Set welcome message
-        if self.welcome_message.value:
-            data['ticket_settings']['welcome_message'] = str(self.welcome_message.value)
-
-        if errors:
-            await interaction.response.send_message(f"❌ **Configuration Errors:**\n" + "\n".join([f"• {error}" for error in errors]), ephemeral=True)
-            return
-
-        save_data(data)
-
-        # Show updated settings
-        settings = data['ticket_settings']
-        support_role = interaction.guild.get_role(settings.get('support_role_id')) if settings.get('support_role_id') else None
-        admin_role = interaction.guild.get_role(settings.get('admin_role_id')) if settings.get('admin_role_id') else None
-        category = interaction.guild.get_channel(settings.get('category_id')) if settings.get('category_id') else None
-        log_channel = interaction.guild.get_channel(settings.get('log_channel_id')) if settings.get('log_channel_id') else None
-
-        embed = discord.Embed(
-            title="✅ Ticket System Configuration Updated",
-            color=0x00ff00,
-            timestamp=datetime.now()
-        )
-        embed.add_field(name="🛡️ Support Role", value=support_role.mention if support_role else "❌ Not set", inline=True)
-        embed.add_field(name="👑 Admin Role", value=admin_role.mention if admin_role else "❌ Not set", inline=True)
-        embed.add_field(name="📁 Default Category", value=category.mention if category else "⚠️ Auto-create", inline=True)
-        embed.add_field(name="📋 Log Channel", value=log_channel.mention if log_channel else "❌ Not set", inline=True)
-        embed.add_field(name="💬 Welcome Message", value=f"```{settings['welcome_message'][:100]}{'...' if len(settings['welcome_message']) > 100 else ''}```", inline=False)
-        
-        embed.set_footer(text="Configuration saved successfully!")
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-class QuickTicketPanelModal(discord.ui.Modal, title="Create Quick Ticket Panel"):
-    def __init__(self):
-        super().__init__()
-
-    panel_title = discord.ui.TextInput(
-        label="Panel Title",
-        placeholder="e.g., 'Support Tickets', 'Help Desk'",
-        max_length=256,
-        required=True
-    )
-
-    panel_description = discord.ui.TextInput(
-        label="Panel Description",
-        placeholder="Describe what this ticket system is for...",
-        style=discord.TextStyle.paragraph,
-        max_length=1000,
-        required=True
-    )
-
-    button_text = discord.ui.TextInput(
-        label="Button Text",
-        placeholder="e.g., 'Get Support', 'Create Ticket'",
-        max_length=80,
-        required=False
-    )
-
-    panel_color = discord.ui.TextInput(
-        label="Panel Color (hex)",
-        placeholder="e.g., #0099ff, #ff0000",
-        max_length=10,
-        required=False
-    )
-
-    custom_category_id = discord.ui.TextInput(
-        label="Custom Category ID (optional)",
-        placeholder="Right-click category > Copy ID",
-        max_length=20,
-        required=False
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
-        data = load_data()
-
-        # Create embed data
-        embed_data = {
-            'title': str(self.panel_title.value),
-            'description': str(self.panel_description.value),
-            'color': str(self.panel_color.value) if self.panel_color.value else '#0099ff',
-            'footer': 'Ticket System',
-            'thumbnail': None,
-            'fields': [],
-            'image': None,
-            'author': None,
-            'has_ticket_system': True,
-            'ticket_button_text': str(self.button_text.value) if self.button_text.value else 'Create Ticket',
-            'ticket_category_id': None
-        }
-
-        # Validate and set custom category if provided
-        if self.custom_category_id.value:
-            try:
-                category = interaction.guild.get_channel(int(self.custom_category_id.value))
-                if category and isinstance(category, discord.CategoryChannel):
-                    embed_data['ticket_category_id'] = category.id
-                else:
-                    await interaction.response.send_message("❌ Invalid category ID! Panel created with global category setting.", ephemeral=True)
-            except ValueError:
-                await interaction.response.send_message("❌ Invalid category ID format! Panel created with global category setting.", ephemeral=True)
-
-        # Save embed
-        embed_id = f"embed_{data.get('embed_counter', 1)}"
-        data['stored_embeds'][embed_id] = embed_data
-        data['embed_counter'] = data.get('embed_counter', 1) + 1
-        save_data(data)
-
-        # Create and send the panel
-        embed = create_embed_from_data(embed_data)
-        view = TicketView(embed_data['ticket_button_text'])
-
-        await interaction.response.send_message(f"✅ Ticket panel '{self.panel_title.value}' created! (ID: {embed_id})", ephemeral=True)
-        await interaction.followup.send(embed=embed, view=view)
 
 # Run the bot
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
