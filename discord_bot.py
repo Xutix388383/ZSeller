@@ -952,8 +952,11 @@ class SpawnEmbedSelectView(discord.ui.View):
         # Create the embed
         embed = create_embed_from_data(embed_data)
 
-        # Send the embed to the channel
-        await interaction.response.send_message(embed=embed)
+        # Create button view if buttons exist
+        button_view = create_embed_button_view(embed_data) if embed_data.get('buttons') else None
+
+        # Send the embed to the channel with buttons
+        await interaction.response.send_message(embed=embed, view=button_view)
 
 class EditEmbedSelectView(discord.ui.View):
     def __init__(self, stored_embeds):
