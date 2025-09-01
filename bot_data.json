@@ -1,8 +1,20 @@
 {
   "ticket_counter": 1,
   "active_tickets": {},
-  "stored_embeds": {},
-  "embed_counter": 1,
+  "stored_embeds": {
+    "embed_1": {
+      "title": "Xnxn",
+      "description": null,
+      "color": null,
+      "footer": null,
+      "thumbnail": null,
+      "fields": [],
+      "image": null,
+      "author": null,
+      "buttons": []
+    }
+  },
+  "embed_counter": 2,
   "ticket_settings": {
     "support_role_id": null,
     "admin_role_id": null,

@@ -133,27 +133,31 @@ class EmbedModal(discord.ui.Modal):
         self.add_item(self.thumbnail_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        embed_data = {
+        # Update the existing embed_data instead of creating new one
+        self.embed_data.update({
             'title': str(self.title_input.value) if self.title_input.value else None,
             'description': str(self.description_input.value) if self.description_input.value else None,
             'color': str(self.color_input.value) if self.color_input.value else None,
             'footer': str(self.footer_input.value) if self.footer_input.value else None,
             'thumbnail': str(self.thumbnail_input.value) if self.thumbnail_input.value else None,
-            'fields': self.embed_data.get('fields', []),
-            'image': self.embed_data.get('image'),
-            'author': self.embed_data.get('author'),
-            'buttons': self.embed_data.get('buttons', [])
-        }
+        })
 
-        view = EmbedOptionsView(embed_data, self.editing_embed_id)
+        # Preserve existing data that wasn't in the modal
+        if 'fields' not in self.embed_data:
+            self.embed_data['fields'] = []
+        if 'buttons' not in self.embed_data:
+            self.embed_data['buttons'] = []
+
+        view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
         action_text = "updated" if self.editing_embed_id else "created"
         await interaction.response.send_message(f"Embed {action_text}! Choose additional options:", view=view, ephemeral=True)
 
 class FieldModal(discord.ui.Modal, title="Add Field"):
-    def __init__(self, embed_data, field_index=None):
+    def __init__(self, embed_data, field_index=None, editing_embed_id=None):
         super().__init__()
         self.embed_data = embed_data
         self.field_index = field_index
+        self.editing_embed_id = editing_embed_id
 
         if field_index is not None and field_index < len(embed_data.get('fields', [])):
             field = embed_data['fields'][field_index]
@@ -185,23 +189,35 @@ class FieldModal(discord.ui.Modal, title="Add Field"):
     )
 
     async def on_submit(self, interaction: discord.Interaction):
-        inline = self.inline_input.value.lower() == 'true'
-        field_data = {
-            'name': str(self.name_input.value),
-            'value': str(self.value_input.value),
-            'inline': inline
-        }
+        try:
+            inline = self.inline_input.value.lower() == 'true'
+            field_data = {
+                'name': str(self.name_input.value),
+                'value': str(self.value_input.value),
+                'inline': inline
+            }
 
-        if 'fields' not in self.embed_data:
-            self.embed_data['fields'] = []
+            if 'fields' not in self.embed_data:
+                self.embed_data['fields'] = []
 
-        if self.field_index is not None:
-            self.embed_data['fields'][self.field_index] = field_data
-        else:
-            self.embed_data['fields'].append(field_data)
+            if self.field_index is not None:
+                self.embed_data['fields'][self.field_index] = field_data
+                action_text = "updated"
+            else:
+                self.embed_data['fields'].append(field_data)
+                action_text = "added"
 
-        view = EmbedOptionsView(self.embed_data)
-        await interaction.response.send_message("Field added! Continue editing:", view=view, ephemeral=True)
+            # Get editing_embed_id from embed_data if it exists
+            editing_embed_id = getattr(self, 'editing_embed_id', None)
+            view = EmbedOptionsView(self.embed_data, editing_embed_id)
+            await interaction.response.send_message(f"✅ Field {action_text}! Continue editing:", view=view, ephemeral=True)
+        except Exception as e:
+            print(f"Error in FieldModal submit: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error with field. Please try again.", ephemeral=True)
+            except:
+                pass
 
 class EmbedOptionsView(discord.ui.View):
     def __init__(self, embed_data, editing_embed_id=None):
@@ -220,37 +236,38 @@ class EmbedOptionsView(discord.ui.View):
             return
 
         try:
-            modal = ButtonModal(self.embed_data)
+            modal = ButtonModal(self.embed_data, editing_embed_id=self.editing_embed_id)
             await interaction.response.send_modal(modal)
         except discord.InteractionResponded:
             # If interaction was already responded to, try followup
-            modal = ButtonModal(self.embed_data)
+            modal = ButtonModal(self.embed_data, editing_embed_id=self.editing_embed_id)
             await interaction.followup.send("Opening button creation modal...", ephemeral=True)
 
-    @discord.ui.button(label="Manage Fields", style=discord.ButtonStyle.secondary, emoji="📋")
-    async def manage_fields(self, interaction: discord.Interaction, button: discord.ui.Button):
-        fields = self.embed_data.get('fields', [])
-        if not fields:
-            await interaction.response.send_message("No fields to manage! Add a field first.", ephemeral=True)
+    @discord.ui.button(label="Create Sound Button", style=discord.ButtonStyle.secondary, emoji="🔊")
+    async def create_sound_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if len(self.embed_data.get('buttons', [])) >= 5:
+            await interaction.response.send_message("❌ Maximum of 5 buttons allowed per embed!", ephemeral=True)
             return
 
-        view = FieldManagerView(self.embed_data, self.editing_embed_id)
-        await interaction.response.send_message("**Field Manager:**\nSelect a field to edit or delete:", view=view, ephemeral=True)
+        try:
+            modal = SoundButtonModal(self.embed_data, editing_embed_id=self.editing_embed_id)
+            await interaction.response.send_modal(modal)
+        except discord.InteractionResponded:
+            modal = SoundButtonModal(self.embed_data, editing_embed_id=self.editing_embed_id)
+            await interaction.followup.send("Opening sound button creation modal...", ephemeral=True)
 
     @discord.ui.button(label="Add Image", style=discord.ButtonStyle.secondary, emoji="🖼️")
     async def add_image(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = ImageModal(self.embed_data)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Add Author", style=discord.ButtonStyle.secondary, emoji="👤")
-    async def add_author(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = AuthorModal(self.embed_data)
-        await interaction.response.send_modal(modal)
-
-    @discord.ui.button(label="Add Field", style=discord.ButtonStyle.secondary, emoji="📝")
-    async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = FieldModal(self.embed_data)
-        await interaction.response.send_modal(modal)
+        try:
+            modal = ImageModal(self.embed_data, self.editing_embed_id)
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            print(f"Error in add_image: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error opening image modal. Please try again.", ephemeral=True)
+            except:
+                pass
 
     @discord.ui.button(label="Manage Buttons", style=discord.ButtonStyle.secondary, emoji="🎛️")
     async def manage_buttons(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -270,59 +287,89 @@ class EmbedOptionsView(discord.ui.View):
 
     @discord.ui.button(label="Save Changes", style=discord.ButtonStyle.primary, emoji="💾")
     async def save_changes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        data = load_data()
+        try:
+            data = load_data()
 
-        if self.editing_embed_id:
-            # Update existing embed - don't create a new one
-            data['stored_embeds'][self.editing_embed_id] = self.embed_data.copy()
-            embed_id = self.editing_embed_id
-            action_text = "updated and saved"
-        else:
-            # Create new embed
-            embed_id = f"embed_{data.get('embed_counter', 1)}"
-            data['stored_embeds'][embed_id] = self.embed_data.copy()
-            data['embed_counter'] = data.get('embed_counter', 1) + 1
-            action_text = "saved"
-            # Update the view to show we're now editing this embed
-            self.editing_embed_id = embed_id
+            if self.editing_embed_id:
+                # Update existing embed - don't create a new one
+                data['stored_embeds'][self.editing_embed_id] = self.embed_data.copy()
+                embed_id = self.editing_embed_id
+                action_text = "updated and saved"
+            else:
+                # Create new embed
+                embed_id = f"embed_{data.get('embed_counter', 1)}"
+                data['stored_embeds'][embed_id] = self.embed_data.copy()
+                data['embed_counter'] = data.get('embed_counter', 1) + 1
+                action_text = "saved"
+                # Update the view to show we're now editing this embed
+                self.editing_embed_id = embed_id
 
-        save_data(data)
+            save_data(data)
 
-        await interaction.response.send_message(f"✅ Embed {action_text}! (ID: {embed_id})", ephemeral=True)
+            await interaction.response.send_message(f"✅ Embed {action_text}! (ID: {embed_id})", ephemeral=True)
+        except Exception as e:
+            print(f"Error in save_changes: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error saving embed. Please try again.", ephemeral=True)
+                else:
+                    await interaction.followup.send("❌ Error saving embed. Please try again.", ephemeral=True)
+            except:
+                pass
 
     @discord.ui.button(label="Send Embed", style=discord.ButtonStyle.success, emoji="✅")
     async def send_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = create_embed_from_data(self.embed_data)
+        try:
+            embed = create_embed_from_data(self.embed_data)
 
-        # Save embed if not already saved
-        data = load_data()
+            # Validate embed has content
+            if not any([self.embed_data.get('title'), self.embed_data.get('description'), 
+                       self.embed_data.get('fields'), self.embed_data.get('image')]):
+                await interaction.response.send_message("❌ Embed must have at least a title, description, field, or image.", ephemeral=True)
+                return
 
-        if self.editing_embed_id:
-            # Update existing embed - don't create a new one
-            data['stored_embeds'][self.editing_embed_id] = self.embed_data.copy()
-            embed_id = self.editing_embed_id
-            action_text = "updated and sent"
-        else:
-            # Create new embed
-            embed_id = f"embed_{data.get('embed_counter', 1)}"
-            data['stored_embeds'][embed_id] = self.embed_data.copy()
-            data['embed_counter'] = data.get('embed_counter', 1) + 1
-            action_text = "sent"
-            # Update the view to show we're now editing this embed
-            self.editing_embed_id = embed_id
+            # Save embed if not already saved
+            data = load_data()
 
-        save_data(data)
+            if self.editing_embed_id:
+                # Update existing embed - don't create a new one
+                data['stored_embeds'][self.editing_embed_id] = self.embed_data.copy()
+                embed_id = self.editing_embed_id
+                action_text = "updated and sent"
+            else:
+                # Create new embed
+                embed_id = f"embed_{data.get('embed_counter', 1)}"
+                data['stored_embeds'][embed_id] = self.embed_data.copy()
+                data['embed_counter'] = data.get('embed_counter', 1) + 1
+                action_text = "sent"
+                # Update the view to show we're now editing this embed
+                self.editing_embed_id = embed_id
 
-        await interaction.response.send_message(f"Embed {action_text}! (ID: {embed_id})", ephemeral=True)
+            save_data(data)
 
-        # Create button view if buttons exist
-        button_view = create_embed_button_view(self.embed_data) if self.embed_data.get('buttons') else None
-        await interaction.followup.send(embed=embed, view=button_view)
+            await interaction.response.send_message(f"✅ Embed {action_text}! (ID: {embed_id})", ephemeral=True)
+
+            # Create button view if buttons exist
+            button_view = create_embed_button_view(self.embed_data) if self.embed_data.get('buttons') else None
+            
+            # Use followup to send the actual embed to avoid interaction timeout
+            await interaction.followup.send(embed=embed, view=button_view)
+            
+        except Exception as e:
+            print(f"Error in send_embed: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error sending embed. Please try again.", ephemeral=True)
+                else:
+                    await interaction.followup.send("❌ Error sending embed. Please try again.", ephemeral=True)
+            except:
+                pass
 
 class ImageModal(discord.ui.Modal, title="Add Image"):
-    def __init__(self, embed_data):
+    def __init__(self, embed_data, editing_embed_id=None):
         super().__init__()
         self.embed_data = embed_data
+        self.editing_embed_id = editing_embed_id
 
         # Create text input with proper default value
         self.image_url = discord.ui.TextInput(
@@ -337,14 +384,23 @@ class ImageModal(discord.ui.Modal, title="Add Image"):
         self.add_item(self.image_url)
 
     async def on_submit(self, interaction: discord.Interaction):
-        self.embed_data['image'] = str(self.image_url.value)
-        view = EmbedOptionsView(self.embed_data)
-        await interaction.response.send_message("Image added! Continue editing:", view=view, ephemeral=True)
+        try:
+            self.embed_data['image'] = str(self.image_url.value)
+            view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+            await interaction.response.send_message("✅ Image added! Continue editing:", view=view, ephemeral=True)
+        except Exception as e:
+            print(f"Error in ImageModal submit: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error adding image. Please try again.", ephemeral=True)
+            except:
+                pass
 
 class AuthorModal(discord.ui.Modal, title="Add Author"):
-    def __init__(self, embed_data):
+    def __init__(self, embed_data, editing_embed_id=None):
         super().__init__()
         self.embed_data = embed_data
+        self.editing_embed_id = editing_embed_id
 
         # Get existing author data
         author = embed_data.get('author', {})
@@ -371,18 +427,91 @@ class AuthorModal(discord.ui.Modal, title="Add Author"):
         self.add_item(self.author_icon)
 
     async def on_submit(self, interaction: discord.Interaction):
-        self.embed_data['author'] = {
-            'name': str(self.author_name.value),
-            'icon_url': str(self.author_icon.value) if self.author_icon.value else None
+        try:
+            self.embed_data['author'] = {
+                'name': str(self.author_name.value),
+                'icon_url': str(self.author_icon.value) if self.author_icon.value else None
+            }
+            view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+            await interaction.response.send_message("✅ Author added! Continue editing:", view=view, ephemeral=True)
+        except Exception as e:
+            print(f"Error in AuthorModal submit: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error adding author. Please try again.", ephemeral=True)
+            except:
+                pass
+
+class SoundButtonModal(discord.ui.Modal, title="Create Sound Button"):
+    def __init__(self, embed_data, editing_embed_id=None):
+        super().__init__()
+        self.embed_data = embed_data
+        self.editing_embed_id = editing_embed_id
+
+    label_input = discord.ui.TextInput(
+        label="Button Label",
+        placeholder="Enter button text (e.g., Play Music)...",
+        max_length=80,
+        required=True
+    )
+
+    emoji_input = discord.ui.TextInput(
+        label="Button Emoji (optional)",
+        placeholder="Enter emoji (e.g., 🔊, 🎵, 🎶)",
+        max_length=10,
+        required=False
+    )
+
+    sound_url_input = discord.ui.TextInput(
+        label="Sound File URL",
+        placeholder="Enter .mp3, .mp4, .wav, or other audio file URL...",
+        style=discord.TextStyle.paragraph,
+        max_length=2048,
+        required=True
+    )
+
+    style_input = discord.ui.TextInput(
+        label="Button Style",
+        placeholder="primary, secondary, success, danger",
+        max_length=20,
+        required=False,
+        default="secondary"
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Validate style
+        valid_styles = ['primary', 'secondary', 'success', 'danger']
+        style = self.style_input.value.lower() if self.style_input.value else 'secondary'
+        if style not in valid_styles:
+            style = 'secondary'
+
+        button_data = {
+            'label': str(self.label_input.value),
+            'emoji': str(self.emoji_input.value) if self.emoji_input.value else None,
+            'style': style,
+            'action': {
+                'type': 'play_sound',
+                'sound_url': str(self.sound_url_input.value)
+            }
         }
-        view = EmbedOptionsView(self.embed_data)
-        await interaction.response.send_message("Author added! Continue editing:", view=view, ephemeral=True)
+
+        if 'buttons' not in self.embed_data:
+            self.embed_data['buttons'] = []
+
+        self.embed_data['buttons'].append(button_data)
+
+        view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
+        try:
+            await interaction.response.send_message("🔊 Sound button created! Continue editing:", view=view, ephemeral=True)
+        except discord.InteractionResponded:
+            await interaction.followup.send("🔊 Sound button created! Continue editing:", view=view, ephemeral=True)
 
 class ButtonModal(discord.ui.Modal, title="Add Button"):
-    def __init__(self, embed_data, button_index=None):
+    def __init__(self, embed_data, button_index=None, editing_embed_id=None):
         super().__init__()
         self.embed_data = embed_data
         self.button_index = button_index
+        self.editing_embed_id = editing_embed_id
 
         if button_index is not None and button_index < len(embed_data.get('buttons', [])):
             button = embed_data['buttons'][button_index]
@@ -438,17 +567,18 @@ class ButtonModal(discord.ui.Modal, title="Add Button"):
             self.embed_data['buttons'].append(button_data)
 
         # Show action selection
-        view = ButtonActionView(self.embed_data, self.button_index or (len(self.embed_data['buttons']) - 1))
+        view = ButtonActionView(self.embed_data, self.button_index or (len(self.embed_data['buttons']) - 1), self.editing_embed_id)
         try:
             await interaction.response.send_message("Button created! Now choose what this button should do:", view=view, ephemeral=True)
         except discord.InteractionResponded:
             await interaction.followup.send("Button created! Now choose what this button should do:", view=view, ephemeral=True)
 
 class ButtonActionView(discord.ui.View):
-    def __init__(self, embed_data, button_index):
+    def __init__(self, embed_data, button_index, editing_embed_id=None):
         super().__init__(timeout=300)
         self.embed_data = embed_data
         self.button_index = button_index
+        self.editing_embed_id = editing_embed_id
 
     @discord.ui.select(
         placeholder="Choose what this button should do...",
@@ -456,6 +586,7 @@ class ButtonActionView(discord.ui.View):
             discord.SelectOption(label="Send Message", value="send_message", description="Send a message to the channel", emoji="💬"),
             discord.SelectOption(label="Send DM", value="send_dm", description="Send a direct message to the user", emoji="📩"),
             discord.SelectOption(label="Custom Response", value="custom_response", description="Send a custom response message", emoji="📝"),
+            discord.SelectOption(label="Play Sound", value="play_sound", description="Play an audio file", emoji="🔊"),
         ]
     )
     async def select_action(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -467,8 +598,46 @@ class ButtonActionView(discord.ui.View):
             modal = ActionConfigModal(self.embed_data, self.button_index, "send_dm", "Configure DM Message")
         elif action_type == "custom_response":
             modal = ActionConfigModal(self.embed_data, self.button_index, "custom_response", "Configure Response")
+        elif action_type == "play_sound":
+            modal = SoundActionModal(self.embed_data, self.button_index)
 
+        # Pass editing_embed_id to the modal
+        modal.editing_embed_id = self.editing_embed_id
         await interaction.response.send_modal(modal)
+
+class SoundActionModal(discord.ui.Modal):
+    def __init__(self, embed_data, button_index):
+        super().__init__(title="Configure Sound Action")
+        self.embed_data = embed_data
+        self.button_index = button_index
+
+        # Get existing action data if editing
+        existing_action = embed_data.get('buttons', [{}])[button_index].get('action', {})
+        default_url = existing_action.get('sound_url', '')
+
+        self.sound_url_input = discord.ui.TextInput(
+            label="Sound File URL",
+            placeholder="Enter .mp3, .mp4, .wav, or other audio file URL...",
+            style=discord.TextStyle.paragraph,
+            max_length=2048,
+            required=True,
+            default=default_url
+        )
+        self.add_item(self.sound_url_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        action_data = {
+            'type': 'play_sound',
+            'sound_url': str(self.sound_url_input.value)
+        }
+
+        # Update button with action
+        self.embed_data['buttons'][self.button_index]['action'] = action_data
+
+        # Get editing_embed_id from the button data if it was being edited
+        editing_embed_id = getattr(self, 'editing_embed_id', None)
+        view = EmbedOptionsView(self.embed_data, editing_embed_id)
+        await interaction.response.send_message(f"🔊 Sound button configured! Continue editing:", view=view, ephemeral=True)
 
 class ActionConfigModal(discord.ui.Modal):
     def __init__(self, embed_data, button_index, action_type, title):
@@ -501,7 +670,9 @@ class ActionConfigModal(discord.ui.Modal):
         # Update button with action
         self.embed_data['buttons'][self.button_index]['action'] = action_data
 
-        view = EmbedOptionsView(self.embed_data)
+        # Get editing_embed_id from the button data if it was being edited
+        editing_embed_id = getattr(self, 'editing_embed_id', None)
+        view = EmbedOptionsView(self.embed_data, editing_embed_id)
         await interaction.response.send_message(f"✅ Button action configured! Continue editing:", view=view, ephemeral=True)
 
 class ButtonManagerView(discord.ui.View):
@@ -694,6 +865,20 @@ def create_embed_button_view(embed_data):
                         await interaction.response.send_message("✅ Message sent to your DMs!", ephemeral=True)
                     except discord.Forbidden:
                         await interaction.response.send_message("❌ Could not send DM. Please check your privacy settings.", ephemeral=True)
+
+                elif action_type == "play_sound":
+                    sound_url = action_data.get('sound_url', '')
+                    if sound_url:
+                        embed = discord.Embed(
+                            title="🔊 Audio Player",
+                            description=f"[Click here to play the audio]({sound_url})",
+                            color=0x1f8b4c
+                        )
+                        embed.add_field(name="Audio URL", value=sound_url, inline=False)
+                        embed.set_footer(text="Click the link above to play the audio file")
+                        await interaction.response.send_message(embed=embed, ephemeral=True)
+                    else:
+                        await interaction.response.send_message("❌ No sound URL configured for this button!", ephemeral=True)
 
                 else:
                     await interaction.response.send_message("🔘 Button clicked! (No action configured)", ephemeral=True)
