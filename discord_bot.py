@@ -45,12 +45,12 @@ async def on_ready():
         await bot.wait_until_ready()
         synced = await bot.tree.sync()
         print(f"✅ Synced {len(synced)} slash commands")
-        
+
         # Print available guilds for debugging
         print(f"📊 Connected to {len(bot.guilds)} guilds:")
         for guild in bot.guilds:
             print(f"  - {guild.name} (ID: {guild.id})")
-            
+
     except Exception as e:
         print(f"❌ Failed to sync commands: {e}")
         import traceback
@@ -61,7 +61,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: discord.
     print(f"❌ App command error: {error}")
     import traceback
     traceback.print_exc()
-    
+
     try:
         if not interaction.response.is_done():
             await interaction.response.send_message("❌ An error occurred while processing the command.", ephemeral=True)
@@ -141,7 +141,8 @@ class EmbedModal(discord.ui.Modal):
             'thumbnail': str(self.thumbnail_input.value) if self.thumbnail_input.value else None,
             'fields': self.embed_data.get('fields', []),
             'image': self.embed_data.get('image'),
-            'author': self.embed_data.get('author')
+            'author': self.embed_data.get('author'),
+            'buttons': self.embed_data.get('buttons', [])
         }
 
         view = EmbedOptionsView(embed_data, self.editing_embed_id)
@@ -217,7 +218,7 @@ class EmbedOptionsView(discord.ui.View):
         if len(self.embed_data.get('buttons', [])) >= 5:
             await interaction.response.send_message("❌ Maximum of 5 buttons allowed per embed!", ephemeral=True)
             return
-        
+
         try:
             modal = ButtonModal(self.embed_data)
             await interaction.response.send_modal(modal)
@@ -255,11 +256,11 @@ class EmbedOptionsView(discord.ui.View):
     async def manage_buttons(self, interaction: discord.Interaction, button: discord.ui.Button):
         buttons = self.embed_data.get('buttons', [])
         if not buttons:
-            await interaction.response.send_message("No buttons to manage! Add a button first.", ephemeral=True)
+            await interaction.response.send_message("No buttons to manage! Add a button first using the 'Create Button' option.", ephemeral=True)
             return
 
         view = ButtonManagerView(self.embed_data, self.editing_embed_id)
-        await interaction.response.send_message("**Button Manager:**\nSelect a button to edit or delete:", view=view, ephemeral=True)
+        await interaction.response.send_message("**Button Manager:**\nSelect a button to edit or delete. All buttons from your embed will be shown here:", view=view, ephemeral=True)
 
     @discord.ui.button(label="Preview", style=discord.ButtonStyle.secondary, emoji="👁️")
     async def preview_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -313,7 +314,7 @@ class EmbedOptionsView(discord.ui.View):
         save_data(data)
 
         await interaction.response.send_message(f"Embed {action_text}! (ID: {embed_id})", ephemeral=True)
-        
+
         # Create button view if buttons exist
         button_view = create_embed_button_view(self.embed_data) if self.embed_data.get('buttons') else None
         await interaction.followup.send(embed=embed, view=button_view)
@@ -323,14 +324,17 @@ class ImageModal(discord.ui.Modal, title="Add Image"):
         super().__init__()
         self.embed_data = embed_data
 
-        self.image_url.default = embed_data.get('image', '')
-
-    image_url = discord.ui.TextInput(
-        label="Image URL",
-        placeholder="Enter image URL...",
-        max_length=2048,
-        required=True
-    )
+        # Create text input with proper default value
+        self.image_url = discord.ui.TextInput(
+            label="Image URL",
+            placeholder="Enter image URL...",
+            max_length=2048,
+            required=True,
+            default=embed_data.get('image', '')
+        )
+        
+        # Add input to modal
+        self.add_item(self.image_url)
 
     async def on_submit(self, interaction: discord.Interaction):
         self.embed_data['image'] = str(self.image_url.value)
@@ -342,23 +346,29 @@ class AuthorModal(discord.ui.Modal, title="Add Author"):
         super().__init__()
         self.embed_data = embed_data
 
+        # Get existing author data
         author = embed_data.get('author', {})
-        self.author_name.default = author.get('name', '')
-        self.author_icon.default = author.get('icon_url', '')
+        
+        # Create text inputs with proper default values
+        self.author_name = discord.ui.TextInput(
+            label="Author Name",
+            placeholder="Enter author name...",
+            max_length=256,
+            required=True,
+            default=author.get('name', '')
+        )
 
-    author_name = discord.ui.TextInput(
-        label="Author Name",
-        placeholder="Enter author name...",
-        max_length=256,
-        required=True
-    )
+        self.author_icon = discord.ui.TextInput(
+            label="Author Icon URL",
+            placeholder="Enter icon URL...",
+            max_length=2048,
+            required=False,
+            default=author.get('icon_url', '')
+        )
 
-    author_icon = discord.ui.TextInput(
-        label="Author Icon URL",
-        placeholder="Enter icon URL...",
-        max_length=2048,
-        required=False
-    )
+        # Add inputs to modal
+        self.add_item(self.author_name)
+        self.add_item(self.author_icon)
 
     async def on_submit(self, interaction: discord.Interaction):
         self.embed_data['author'] = {
@@ -444,29 +454,20 @@ class ButtonActionView(discord.ui.View):
         placeholder="Choose what this button should do...",
         options=[
             discord.SelectOption(label="Send Message", value="send_message", description="Send a message to the channel", emoji="💬"),
-            discord.SelectOption(label="Give Role", value="give_role", description="Give a role to the user", emoji="🎭"),
-            discord.SelectOption(label="Remove Role", value="remove_role", description="Remove a role from the user", emoji="🗑️"),
             discord.SelectOption(label="Send DM", value="send_dm", description="Send a direct message to the user", emoji="📩"),
             discord.SelectOption(label="Custom Response", value="custom_response", description="Send a custom response message", emoji="📝"),
-            discord.SelectOption(label="Shop Item", value="shop_item", description="Virtual shop item purchase", emoji="🛒"),
         ]
     )
     async def select_action(self, interaction: discord.Interaction, select: discord.ui.Select):
         action_type = select.values[0]
-        
+
         if action_type == "send_message":
             modal = ActionConfigModal(self.embed_data, self.button_index, "send_message", "Configure Message")
-        elif action_type == "give_role":
-            modal = ActionConfigModal(self.embed_data, self.button_index, "give_role", "Configure Role to Give")
-        elif action_type == "remove_role":
-            modal = ActionConfigModal(self.embed_data, self.button_index, "remove_role", "Configure Role to Remove")
         elif action_type == "send_dm":
             modal = ActionConfigModal(self.embed_data, self.button_index, "send_dm", "Configure DM Message")
         elif action_type == "custom_response":
             modal = ActionConfigModal(self.embed_data, self.button_index, "custom_response", "Configure Response")
-        elif action_type == "shop_item":
-            modal = ActionConfigModal(self.embed_data, self.button_index, "shop_item", "Configure Shop Item")
-        
+
         await interaction.response.send_modal(modal)
 
 class ActionConfigModal(discord.ui.Modal):
@@ -476,62 +477,26 @@ class ActionConfigModal(discord.ui.Modal):
         self.button_index = button_index
         self.action_type = action_type
 
-        # Configure fields based on action type
-        if action_type in ["send_message", "custom_response", "send_dm"]:
-            self.add_item(discord.ui.TextInput(
-                label="Message Content",
-                placeholder="Enter the message to send...",
-                style=discord.TextStyle.paragraph,
-                max_length=2000,
-                required=True
-            ))
-        elif action_type in ["give_role", "remove_role"]:
-            self.add_item(discord.ui.TextInput(
-                label="Role ID",
-                placeholder="Enter the role ID (right-click role, copy ID)...",
-                max_length=25,
-                required=True
-            ))
-            self.add_item(discord.ui.TextInput(
-                label="Success Message",
-                placeholder="Message to send when action succeeds...",
-                max_length=200,
-                required=False,
-                default="Action completed!"
-            ))
-        elif action_type == "shop_item":
-            self.add_item(discord.ui.TextInput(
-                label="Item Name",
-                placeholder="Enter item name...",
-                max_length=100,
-                required=True
-            ))
-            self.add_item(discord.ui.TextInput(
-                label="Item Price",
-                placeholder="Enter price (for display)...",
-                max_length=50,
-                required=True
-            ))
-            self.add_item(discord.ui.TextInput(
-                label="Purchase Message",
-                placeholder="Message sent when purchased...",
-                style=discord.TextStyle.paragraph,
-                max_length=500,
-                required=True
-            ))
+        # Get existing action data if editing
+        existing_action = embed_data.get('buttons', [{}])[button_index].get('action', {})
+        default_message = existing_action.get('message', '')
+
+        # Add message input for all action types
+        self.message_input = discord.ui.TextInput(
+            label="Message Content",
+            placeholder="Enter the message to send...",
+            style=discord.TextStyle.paragraph,
+            max_length=2000,
+            required=True,
+            default=default_message
+        )
+        self.add_item(self.message_input)
 
     async def on_submit(self, interaction: discord.Interaction):
-        action_data = {'type': self.action_type}
-        
-        if self.action_type in ["send_message", "custom_response", "send_dm"]:
-            action_data['message'] = str(self.children[0].value)
-        elif self.action_type in ["give_role", "remove_role"]:
-            action_data['role_id'] = str(self.children[0].value)
-            action_data['success_message'] = str(self.children[1].value) if self.children[1].value else "Action completed!"
-        elif self.action_type == "shop_item":
-            action_data['item_name'] = str(self.children[0].value)
-            action_data['price'] = str(self.children[1].value)
-            action_data['purchase_message'] = str(self.children[2].value)
+        action_data = {
+            'type': self.action_type,
+            'message': str(self.message_input.value)
+        }
 
         # Update button with action
         self.embed_data['buttons'][self.button_index]['action'] = action_data
@@ -544,6 +509,7 @@ class ButtonManagerView(discord.ui.View):
         super().__init__(timeout=300)
         self.embed_data = embed_data
         self.editing_embed_id = editing_embed_id
+        self.selected_button_index = None
 
         # Create select menu for buttons
         buttons = embed_data.get('buttons', [])
@@ -551,7 +517,7 @@ class ButtonManagerView(discord.ui.View):
         for i, button in enumerate(buttons):
             button_label = button.get('label', f'Button {i+1}')
             action_type = button.get('action', {}).get('type', 'No action')
-            
+
             options.append(discord.SelectOption(
                 label=f"{i+1}. {button_label}"[:100],
                 value=str(i),
@@ -576,23 +542,21 @@ class ButtonManagerView(discord.ui.View):
         embed.add_field(name="Label", value=button.get('label', 'No label'), inline=False)
         embed.add_field(name="Style", value=button.get('style', 'primary'), inline=True)
         embed.add_field(name="Emoji", value=button.get('emoji', 'None'), inline=True)
-        
+
         action = button.get('action', {})
         action_desc = f"Type: {action.get('type', 'None')}"
         if action.get('type') in ['send_message', 'custom_response', 'send_dm']:
             action_desc += f"\nMessage: {action.get('message', 'N/A')[:100]}"
         elif action.get('type') in ['give_role', 'remove_role']:
             action_desc += f"\nRole ID: {action.get('role_id', 'N/A')}"
-        elif action.get('type') == 'shop_item':
-            action_desc += f"\nItem: {action.get('item_name', 'N/A')} - {action.get('price', 'N/A')}"
-        
+
         embed.add_field(name="Action", value=action_desc, inline=False)
 
         await interaction.response.send_message(embed=embed, view=self, ephemeral=True)
 
     @discord.ui.button(label="Edit Selected Button", style=discord.ButtonStyle.primary, emoji="✏️")
     async def edit_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not hasattr(self, 'selected_button_index'):
+        if self.selected_button_index is None:
             await interaction.response.send_message("❌ Please select a button first!", ephemeral=True)
             return
 
@@ -601,7 +565,7 @@ class ButtonManagerView(discord.ui.View):
 
     @discord.ui.button(label="Delete Selected Button", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not hasattr(self, 'selected_button_index'):
+        if self.selected_button_index is None:
             await interaction.response.send_message("❌ Please select a button first!", ephemeral=True)
             return
 
@@ -663,52 +627,66 @@ def create_embed_button_view(embed_data):
     """Create a view with buttons for an embed"""
     if not embed_data.get('buttons'):
         return None
-    
+
     class DynamicEmbedView(discord.ui.View):
         def __init__(self, buttons_data):
-            super().__init__(timeout=None)
+            super().__init__(timeout=None)  # Persistent view to avoid rate limiting
             self.buttons_data = buttons_data
-            
-            # Add buttons dynamically
-            for i, button_data in enumerate(buttons_data):
+            self.user_cooldowns = {}  # Track cooldowns per user
+
+            # Add buttons dynamically with rate limiting protection
+            for i, button_data in enumerate(buttons_data[:5]):  # Limit to 5 buttons max
                 style_map = {
                     'primary': discord.ButtonStyle.primary,
                     'secondary': discord.ButtonStyle.secondary,
                     'success': discord.ButtonStyle.success,
                     'danger': discord.ButtonStyle.danger
                 }
-                
+
                 style = style_map.get(button_data.get('style', 'primary'), discord.ButtonStyle.primary)
-                
-                # Create button
+
+                # Create button with unique custom_id based on content hash
+                button_hash = abs(hash(f"{button_data.get('label', '')}{button_data.get('action', {})}")) % 1000000
                 button = discord.ui.Button(
                     label=button_data.get('label', f'Button {i+1}'),
                     style=style,
                     emoji=button_data.get('emoji'),
-                    custom_id=f"embed_button_{i}"
+                    custom_id=f"emb_btn_{i}_{button_hash}"
                 )
-                
+
                 # Create callback function
                 button.callback = self.create_button_callback(i, button_data.get('action', {}))
                 self.add_item(button)
-        
+
         def create_button_callback(self, button_index, action_data):
             async def button_callback(interaction):
+                # Enhanced cooldown check per user
+                import time
+                current_time = time.time()
+                user_id = interaction.user.id
+                
+                if user_id in self.user_cooldowns:
+                    if current_time - self.user_cooldowns[user_id] < 2:  # 2 second cooldown per user
+                        await interaction.response.send_message("⏱️ Please wait a moment before clicking again.", ephemeral=True)
+                        return
+
+                self.user_cooldowns[user_id] = current_time
+
                 await self.handle_button_action(interaction, action_data)
             return button_callback
-        
+
         async def handle_button_action(self, interaction, action_data):
             action_type = action_data.get('type')
-            
+
             try:
                 if action_type == "send_message":
                     message = action_data.get('message', 'Button clicked!')
                     await interaction.response.send_message(message)
-                
+
                 elif action_type == "custom_response":
                     message = action_data.get('message', 'Custom response!')
                     await interaction.response.send_message(message, ephemeral=True)
-                
+
                 elif action_type == "send_dm":
                     message = action_data.get('message', 'Hello from the bot!')
                     try:
@@ -716,63 +694,17 @@ def create_embed_button_view(embed_data):
                         await interaction.response.send_message("✅ Message sent to your DMs!", ephemeral=True)
                     except discord.Forbidden:
                         await interaction.response.send_message("❌ Could not send DM. Please check your privacy settings.", ephemeral=True)
-                
-                elif action_type == "give_role":
-                    role_id = int(action_data.get('role_id', 0))
-                    role = interaction.guild.get_role(role_id)
-                    if role:
-                        if role in interaction.user.roles:
-                            await interaction.response.send_message(f"❌ You already have the {role.name} role!", ephemeral=True)
-                        else:
-                            try:
-                                await interaction.user.add_roles(role)
-                                success_msg = action_data.get('success_message', f"✅ You've been given the {role.name} role!")
-                                await interaction.response.send_message(success_msg, ephemeral=True)
-                            except discord.Forbidden:
-                                await interaction.response.send_message("❌ I don't have permission to assign this role!", ephemeral=True)
-                    else:
-                        await interaction.response.send_message("❌ Role not found!", ephemeral=True)
-                
-                elif action_type == "remove_role":
-                    role_id = int(action_data.get('role_id', 0))
-                    role = interaction.guild.get_role(role_id)
-                    if role:
-                        if role not in interaction.user.roles:
-                            await interaction.response.send_message(f"❌ You don't have the {role.name} role!", ephemeral=True)
-                        else:
-                            try:
-                                await interaction.user.remove_roles(role)
-                                success_msg = action_data.get('success_message', f"✅ The {role.name} role has been removed!")
-                                await interaction.response.send_message(success_msg, ephemeral=True)
-                            except discord.Forbidden:
-                                await interaction.response.send_message("❌ I don't have permission to remove this role!", ephemeral=True)
-                    else:
-                        await interaction.response.send_message("❌ Role not found!", ephemeral=True)
-                
-                elif action_type == "shop_item":
-                    item_name = action_data.get('item_name', 'Mystery Item')
-                    price = action_data.get('price', 'Free')
-                    purchase_msg = action_data.get('purchase_message', f'You purchased {item_name} for {price}!')
-                    
-                    embed = discord.Embed(
-                        title="🛒 Purchase Successful!",
-                        description=purchase_msg,
-                        color=0x00ff00,
-                        timestamp=datetime.now()
-                    )
-                    embed.add_field(name="Item", value=item_name, inline=True)
-                    embed.add_field(name="Price", value=price, inline=True)
-                    embed.set_footer(text=f"Purchased by {interaction.user.display_name}")
-                    
-                    await interaction.response.send_message(embed=embed, ephemeral=True)
-                
+
                 else:
                     await interaction.response.send_message("🔘 Button clicked! (No action configured)", ephemeral=True)
-                    
+
             except Exception as e:
                 print(f"Error in button action: {e}")
-                await interaction.response.send_message("❌ An error occurred while processing the button action.", ephemeral=True)
-    
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ An error occurred while processing the button action.", ephemeral=True)
+                else:
+                    await interaction.followup.send("❌ An error occurred while processing the button action.", ephemeral=True)
+
     return DynamicEmbedView(embed_data['buttons'])
 
 class FieldManagerView(discord.ui.View):
@@ -884,6 +816,7 @@ class EmbedSelectView(discord.ui.View):
         )
         info_embed.add_field(name="Title", value=embed_data.get('title', 'No title'), inline=True)
         info_embed.add_field(name="Fields Count", value=len(embed_data.get('fields', [])), inline=True)
+        info_embed.add_field(name="Buttons Count", value=len(embed_data.get('buttons', [])), inline=True)
 
         await interaction.response.send_message(embeds=[info_embed, preview_embed], view=self, ephemeral=True)
 
@@ -974,8 +907,6 @@ class EditEmbedSelectView(discord.ui.View):
         # Open the edit modal
         modal = EmbedModal(embed_data, embed_id)
         await interaction.response.send_modal(modal)
-
-# Bot functionality continues here
 
 # Slash Commands
 @bot.tree.command(name="create_embed", description="Create a custom embed message")
@@ -1069,10 +1000,11 @@ async def list_embeds(interaction: discord.Interaction):
         for embed_id, embed_data in list(data['stored_embeds'].items())[:10]:  # Limit to first 10
             title = embed_data.get('title', 'No title')
             field_count = len(embed_data.get('fields', []))
+            button_count = len(embed_data.get('buttons', []))
 
             summary_embed.add_field(
                 name=f"{embed_id}",
-                value=f"**Title:** {title[:50]}{'...' if len(title) > 50 else ''}\n**Fields:** {field_count}",
+                value=f"**Title:** {title[:50]}{'...' if len(title) > 50 else ''}\n**Fields:** {field_count}\n**Buttons:** {button_count}",
                 inline=True
             )
 
@@ -1154,671 +1086,6 @@ async def delete_embed(interaction: discord.Interaction, embed_id: str):
         try:
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-
-
-
-
-# Membership System Commands
-
-# Membership configuration - you can modify these
-MEMBERSHIP_CONFIG = {
-    "ria_premium": {
-        "name": "RIA Premium Membership",
-        "price": "$3/month",
-        "role_id": 1411525587474059264,  # RIA Premium role ID
-        "benefits": [
-            "🎁 EXCLUSIVE Giveaways",
-            "👕 RARE RIA PREMIUM SHIRT (IRL or in-server)",
-            "🔒 HIDDEN Channel Access (Premium Members ONLY)",
-            "⭐ Special Role in the server",
-            "📝 ANY NAME OF YOUR CHOICE in the Discord!"
-        ],
-        "emoji": "💎",
-        "signup_url": "https://docs.google.com/forms/d/e/1FAIpQLSckQudNZqdY1AF_Xco-KBueeQ_aa3R1XWEtR5aUKJM-KZmqVw/viewform"
-    }
-}
-
-@bot.tree.command(name="membership", description="View available memberships")
-async def membership(interaction: discord.Interaction):
-    """Display available membership tiers"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="🌟 Server Memberships",
-            description="Choose your membership tier and unlock exclusive benefits!",
-            color=0xFFD700
-        )
-
-        for tier_id, config in MEMBERSHIP_CONFIG.items():
-            benefits_text = "\n".join(config["benefits"])
-            embed.add_field(
-                name=f"{config['emoji']} {config['name']} - {config['price']}",
-                value=f"```{benefits_text}```",
-                inline=False
-            )
-
-        embed.set_footer(text="Use /purchase_membership to buy a membership!")
-        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
-
-        # Create purchase buttons
-        view = MembershipPurchaseView()
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in membership command: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="purchase_membership", description="Purchase a membership tier")
-@discord.app_commands.describe(tier="Choose membership tier")
-@discord.app_commands.choices(tier=[
-    discord.app_commands.Choice(name="💎 RIA Premium Membership", value="ria_premium")
-])
-async def purchase_membership(interaction: discord.Interaction, tier: str):
-    """Handle membership purchase"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        if tier not in MEMBERSHIP_CONFIG:
-            await interaction.response.send_message("❌ Invalid membership tier!", ephemeral=True)
-            return
-
-        config = MEMBERSHIP_CONFIG[tier]
-        
-        # Create purchase confirmation embed
-        embed = discord.Embed(
-            title=f"{config['emoji']} Purchase {config['name']}",
-            description=f"**Price:** {config['price']}\n\n**Benefits Include:**",
-            color=0x00FF00
-        )
-
-        benefits_text = "\n".join(config["benefits"])
-        embed.add_field(name="Your Benefits", value=benefits_text, inline=False)
-        
-        embed.add_field(
-            name="💳 Sign Up Now!",
-            value=f"**[Click here to sign up for ONLY $3/month!]({config.get('signup_url', '#')})**\n\n```To complete your purchase:\n1. Fill out the signup form\n2. Submit proof of payment\n3. Get immediate access!```",
-            inline=False
-        )
-
-        embed.add_field(
-            name="🚀 Get Started",
-            value="Don't forget to submit proof of payment at the end to get immediate access!\n**Elevate your RIA experience today!**",
-            inline=False
-        )
-        
-        embed.set_footer(text="Thank you for supporting our server!")
-
-        # Create confirmation view
-        view = PurchaseConfirmationView(tier, f"txn_{interaction.user.id}_{int(datetime.now().timestamp())}")
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in purchase_membership: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="grant_membership", description="Grant membership to a user (Staff Only)")
-@discord.app_commands.describe(
-    member="The member to grant membership to",
-    tier="Membership tier to grant"
-)
-@discord.app_commands.choices(tier=[
-    discord.app_commands.Choice(name="💎 RIA Premium Membership", value="ria_premium")
-])
-async def grant_membership(interaction: discord.Interaction, member: discord.Member, tier: str):
-    """Grant membership to a user (staff command)"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Check if user has permission (you can modify this check)
-        if not interaction.user.guild_permissions.manage_roles:
-            await interaction.response.send_message("❌ You don't have permission to grant memberships!", ephemeral=True)
-            return
-
-        if tier not in MEMBERSHIP_CONFIG:
-            await interaction.response.send_message("❌ Invalid membership tier!", ephemeral=True)
-            return
-
-        config = MEMBERSHIP_CONFIG[tier]
-        
-        # Check if role is configured
-        if not config["role_id"]:
-            await interaction.response.send_message("❌ Membership role not configured! Please set the role ID in the bot configuration.", ephemeral=True)
-            return
-
-        role = interaction.guild.get_role(config["role_id"])
-        if not role:
-            await interaction.response.send_message("❌ Membership role not found!", ephemeral=True)
-            return
-
-        # Check if user already has the role
-        if role in member.roles:
-            await interaction.response.send_message(f"❌ {member.mention} already has {config['name']}!", ephemeral=True)
-            return
-
-        # Grant the role
-        try:
-            await member.add_roles(role)
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to assign this role!", ephemeral=True)
-            return
-
-        # Create success embed
-        embed = discord.Embed(
-            title="✅ Membership Granted!",
-            description=f"{member.mention} has been granted **{config['name']}**!",
-            color=0x00FF00
-        )
-        embed.add_field(name="Granted by", value=interaction.user.mention, inline=True)
-        embed.add_field(name="Membership Tier", value=f"{config['emoji']} {config['name']}", inline=True)
-
-        await interaction.response.send_message(embed=embed)
-
-        # Send welcome DM to the member
-        try:
-            dm_embed = discord.Embed(
-                title=f"🎉 Welcome to {config['name']}!",
-                description=f"Congratulations! You now have access to exclusive member benefits in **{interaction.guild.name}**.",
-                color=0xFFD700
-            )
-            benefits_text = "\n".join(config["benefits"])
-            dm_embed.add_field(name="Your Benefits", value=benefits_text, inline=False)
-            dm_embed.set_footer(text="Thank you for being a valued member!")
-
-            await member.send(embed=dm_embed)
-        except discord.Forbidden:
-            pass  # User has DMs disabled
-
-    except Exception as e:
-        print(f"Error in grant_membership: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="revoke_membership", description="Revoke membership from a user (Staff Only)")
-@discord.app_commands.describe(
-    member="The member to revoke membership from",
-    tier="Membership tier to revoke"
-)
-@discord.app_commands.choices(tier=[
-    discord.app_commands.Choice(name="💎 RIA Premium Membership", value="ria_premium")
-])
-async def revoke_membership(interaction: discord.Interaction, member: discord.Member, tier: str):
-    """Revoke membership from a user (staff command)"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Check if user has permission
-        if not interaction.user.guild_permissions.manage_roles:
-            await interaction.response.send_message("❌ You don't have permission to revoke memberships!", ephemeral=True)
-            return
-
-        if tier not in MEMBERSHIP_CONFIG:
-            await interaction.response.send_message("❌ Invalid membership tier!", ephemeral=True)
-            return
-
-        config = MEMBERSHIP_CONFIG[tier]
-        
-        if not config["role_id"]:
-            await interaction.response.send_message("❌ Membership role not configured!", ephemeral=True)
-            return
-
-        role = interaction.guild.get_role(config["role_id"])
-        if not role:
-            await interaction.response.send_message("❌ Membership role not found!", ephemeral=True)
-            return
-
-        if role not in member.roles:
-            await interaction.response.send_message(f"❌ {member.mention} doesn't have {config['name']}!", ephemeral=True)
-            return
-
-        # Remove the role
-        try:
-            await member.remove_roles(role)
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to remove this role!", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="🗑️ Membership Revoked",
-            description=f"{config['name']} has been revoked from {member.mention}.",
-            color=0xFF6B6B
-        )
-        embed.add_field(name="Revoked by", value=interaction.user.mention, inline=True)
-
-        await interaction.response.send_message(embed=embed)
-
-    except Exception as e:
-        print(f"Error in revoke_membership: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="my_membership", description="Check your current membership status")
-async def my_membership(interaction: discord.Interaction):
-    """Check user's current membership status"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        user_memberships = []
-        
-        for tier_id, config in MEMBERSHIP_CONFIG.items():
-            if config["role_id"]:
-                role = interaction.guild.get_role(config["role_id"])
-                if role and role in interaction.user.roles:
-                    user_memberships.append((tier_id, config))
-
-        embed = discord.Embed(
-            title="👤 Your Membership Status",
-            color=0x0099FF
-        )
-
-        if user_memberships:
-            embed.description = "🎉 Thank you for being a valued member!"
-            
-            for tier_id, config in user_memberships:
-                benefits_text = "\n".join(config["benefits"])
-                embed.add_field(
-                    name=f"{config['emoji']} {config['name']}",
-                    value=f"```{benefits_text}```",
-                    inline=False
-                )
-        else:
-            embed.description = "You don't have any active memberships."
-            embed.add_field(
-                name="💡 Want to become a member?",
-                value="Use `/membership` to view available tiers and `/purchase_membership` to get started!",
-                inline=False
-            )
-
-        embed.set_thumbnail(url=interaction.user.display_avatar.url)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in my_membership: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-class MembershipPurchaseView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label="💎 Buy RIA Premium", style=discord.ButtonStyle.primary)
-    async def buy_ria_premium(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await purchase_membership.callback(interaction, "ria_premium")
-
-class PurchaseConfirmationView(discord.ui.View):
-    def __init__(self, tier, transaction_id):
-        super().__init__(timeout=300)
-        self.tier = tier
-        self.transaction_id = transaction_id
-
-    @discord.ui.button(label="📝 Sign Up Now", style=discord.ButtonStyle.primary, emoji="🚀")
-    async def signup_now(self, interaction: discord.Interaction, button: discord.ui.Button):
-        config = MEMBERSHIP_CONFIG[self.tier]
-        signup_url = config.get('signup_url', '#')
-        
-        embed = discord.Embed(
-            title="🚀 Complete Your Membership!",
-            description=f"**Click the link below to sign up for RIA Premium:**\n\n🔗 **[SIGN UP FOR ONLY $3/MONTH!]({signup_url})**",
-            color=0x00FF00
-        )
-        embed.add_field(
-            name="📋 What to do:",
-            value="1. Click the signup link above\n2. Fill out the form completely\n3. Submit proof of payment\n4. Get immediate access to all benefits!",
-            inline=False
-        )
-        embed.set_footer(text="Elevate your RIA experience today!")
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @discord.ui.button(label="📞 Contact Staff", style=discord.ButtonStyle.secondary)
-    async def contact_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
-            title="📞 Need Help?",
-            description="If you need assistance with your membership purchase, contact any staff member.",
-            color=0x0099FF
-        )
-        embed.add_field(name="How to Contact", value="• Send a DM to any staff member\n• Use a support ticket\n• Tag staff in an appropriate channel", inline=False)
-        
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-@bot.tree.command(name="membership_panel", description="Create a membership panel for users to purchase")
-async def membership_panel(interaction: discord.Interaction):
-    """Create and send a membership panel embed"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Check if user has permission to create panels
-        if not interaction.user.guild_permissions.manage_messages:
-            await interaction.response.send_message("❌ You need Manage Messages permission to create membership panels!", ephemeral=True)
-            return
-
-        config = MEMBERSHIP_CONFIG["ria_premium"]
-        
-        # Create the main membership panel embed
-        embed = discord.Embed(
-            title="🌟 RIA Premium Membership",
-            description="**Sign up now for ONLY $3/month and unlock these EXCLUSIVE benefits:**",
-            color=0xFFD700
-        )
-        
-        # Add benefits as fields
-        benefits_text = "\n".join(config["benefits"])
-        embed.add_field(
-            name="💎 Exclusive Benefits",
-            value=benefits_text,
-            inline=False
-        )
-        
-        embed.add_field(
-            name="💰 Price",
-            value=f"**{config['price']}**",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="🚀 Get Started",
-            value=f"[Sign Up Here!]({config['signup_url']})",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="📋 Important",
-            value="Don't forget to submit proof of payment at the end to get immediate access!",
-            inline=False
-        )
-        
-        embed.set_footer(text="Elevate your RIA experience today!")
-        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
-        
-        # Create view with purchase button
-        class MembershipPanelView(discord.ui.View):
-            def __init__(self):
-                super().__init__(timeout=None)  # Persistent view
-                
-            @discord.ui.button(label="💎 Buy RIA Premium - $3/month", style=discord.ButtonStyle.primary, emoji="🛒")
-            async def purchase_premium(self, button_interaction: discord.Interaction, button: discord.ui.Button):
-                config = MEMBERSHIP_CONFIG["ria_premium"]
-                
-                # Check if user already has the role
-                premium_role = button_interaction.guild.get_role(config["role_id"])
-                if premium_role and premium_role in button_interaction.user.roles:
-                    await button_interaction.response.send_message("✅ You already have RIA Premium membership!", ephemeral=True)
-                    return
-                
-                # Create purchase embed
-                purchase_embed = discord.Embed(
-                    title="💎 Purchase RIA Premium Membership",
-                    description=f"**Ready to upgrade your RIA experience?**\n\nPrice: **{config['price']}**",
-                    color=0x00FF00
-                )
-                
-                purchase_embed.add_field(
-                    name="🎁 What You'll Get",
-                    value="\n".join(config["benefits"]),
-                    inline=False
-                )
-                
-                purchase_embed.add_field(
-                    name="💳 Complete Your Purchase",
-                    value=f"**[🔗 Sign Up Now for ONLY $3/month!]({config['signup_url']})**\n\n```Steps to complete:\n1. Fill out the signup form\n2. Submit proof of payment\n3. Get immediate access!```",
-                    inline=False
-                )
-                
-                purchase_embed.set_footer(text="Elevate your RIA experience today!")
-                
-                await button_interaction.response.send_message(embed=purchase_embed, ephemeral=True)
-            
-            @discord.ui.button(label="ℹ️ Check My Membership", style=discord.ButtonStyle.secondary)
-            async def check_membership(self, button_interaction: discord.Interaction, button: discord.ui.Button):
-                await my_membership.callback(button_interaction)
-
-        view = MembershipPanelView()
-        await interaction.response.send_message("✅ Creating membership panel...", ephemeral=True)
-        await interaction.followup.send(embed=embed, view=view)
-
-    except Exception as e:
-        print(f"Error in membership_panel: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="membership_stats", description="View membership statistics (Admin Only)")
-async def membership_stats(interaction: discord.Interaction):
-    """View membership statistics for admins"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Check admin permissions
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ This command requires Administrator permissions!", ephemeral=True)
-            return
-
-        guild = interaction.guild
-        config = MEMBERSHIP_CONFIG["ria_premium"]
-        
-        # Get the premium role
-        premium_role = guild.get_role(config["role_id"])
-        if not premium_role:
-            await interaction.response.send_message("❌ Premium membership role not found!", ephemeral=True)
-            return
-
-        # Count members with premium role
-        premium_members = [member for member in guild.members if premium_role in member.roles and not member.bot]
-        total_members = len([member for member in guild.members if not member.bot])
-        
-        # Calculate statistics
-        premium_percentage = (len(premium_members) / total_members * 100) if total_members > 0 else 0
-        
-        embed = discord.Embed(
-            title="📊 Membership Statistics",
-            description=f"Statistics for **{guild.name}**",
-            color=0x0099FF
-        )
-        
-        embed.add_field(
-            name="💎 RIA Premium Members",
-            value=f"**{len(premium_members)}** members\n({premium_percentage:.1f}% of server)",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="👥 Total Members",
-            value=f"**{total_members}** members",
-            inline=True
-        )
-        
-        embed.add_field(
-            name="💰 Monthly Revenue",
-            value=f"**${len(premium_members) * 3}** estimated",
-            inline=True
-        )
-        
-        # Show recent premium members (last 10)
-        if premium_members:
-            recent_members = sorted(premium_members, key=lambda m: m.joined_at or datetime.min, reverse=True)[:10]
-            members_list = "\n".join([f"• {member.mention}" for member in recent_members])
-            embed.add_field(
-                name="🔥 Recent Premium Members",
-                value=members_list,
-                inline=False
-            )
-        
-        embed.set_footer(text=f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in membership_stats: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="list_premium_members", description="List all premium members (Admin Only)")
-async def list_premium_members(interaction: discord.Interaction):
-    """List all premium members for admins"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Check admin permissions
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ This command requires Administrator permissions!", ephemeral=True)
-            return
-
-        guild = interaction.guild
-        config = MEMBERSHIP_CONFIG["ria_premium"]
-        
-        # Get the premium role
-        premium_role = guild.get_role(config["role_id"])
-        if not premium_role:
-            await interaction.response.send_message("❌ Premium membership role not found!", ephemeral=True)
-            return
-
-        # Get all premium members
-        premium_members = [member for member in guild.members if premium_role in member.roles and not member.bot]
-        
-        if not premium_members:
-            await interaction.response.send_message("No premium members found.", ephemeral=True)
-            return
-
-        embed = discord.Embed(
-            title="💎 RIA Premium Members",
-            description=f"Total Premium Members: **{len(premium_members)}**",
-            color=0xFFD700
-        )
-
-        # Split members into chunks of 20 for multiple fields
-        chunk_size = 20
-        for i in range(0, len(premium_members), chunk_size):
-            chunk = premium_members[i:i+chunk_size]
-            member_list = "\n".join([f"• {member.mention} ({member.display_name})" for member in chunk])
-            
-            field_name = f"Members {i+1}-{min(i+chunk_size, len(premium_members))}"
-            embed.add_field(name=field_name, value=member_list, inline=False)
-
-        embed.set_footer(text=f"Use /grant_membership or /revoke_membership to manage members")
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in list_premium_members: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="membership_audit", description="Audit membership permissions and setup (Admin Only)")
-async def membership_audit(interaction: discord.Interaction):
-    """Audit membership system for admins"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
-
-        # Check admin permissions
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ This command requires Administrator permissions!", ephemeral=True)
-            return
-
-        guild = interaction.guild
-        config = MEMBERSHIP_CONFIG["ria_premium"]
-        
-        embed = discord.Embed(
-            title="🔍 Membership System Audit",
-            description="System status and configuration check",
-            color=0x0099FF
-        )
-        
-        # Check premium role
-        premium_role = guild.get_role(config["role_id"])
-        if premium_role:
-            embed.add_field(
-                name="✅ Premium Role",
-                value=f"**{premium_role.name}** (ID: {premium_role.id})\nPosition: {premium_role.position}\nMembers: {len(premium_role.members)}",
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name="❌ Premium Role",
-                value=f"Role ID {config['role_id']} not found!",
-                inline=False
-            )
-        
-        # Check bot permissions
-        bot_member = guild.get_member(bot.user.id)
-        can_manage_roles = bot_member.guild_permissions.manage_roles if bot_member else False
-        can_send_messages = bot_member.guild_permissions.send_messages if bot_member else False
-        
-        permissions_status = "✅" if (can_manage_roles and can_send_messages) else "⚠️"
-        embed.add_field(
-            name=f"{permissions_status} Bot Permissions",
-            value=f"Manage Roles: {'✅' if can_manage_roles else '❌'}\nSend Messages: {'✅' if can_send_messages else '❌'}",
-            inline=True
-        )
-        
-        # Check signup URL
-        url_status = "✅" if config.get('signup_url') and config['signup_url'] != '#' else "⚠️"
-        embed.add_field(
-            name=f"{url_status} Signup URL",
-            value="Configured" if url_status == "✅" else "Not configured",
-            inline=True
-        )
-        
-        # Add configuration summary
-        embed.add_field(
-            name="⚙️ Configuration",
-            value=f"**Price:** {config['price']}\n**Benefits:** {len(config['benefits'])} configured",
-            inline=False
-        )
-
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in membership_audit: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
