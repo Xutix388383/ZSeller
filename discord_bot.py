@@ -13,6 +13,20 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# Staff role ID
+STAFF_ROLE_ID = 1409695735829626942
+
+def is_staff(interaction: discord.Interaction) -> bool:
+    """Check if the user has the staff role"""
+    if not interaction.guild:
+        return False
+
+    member = interaction.guild.get_member(interaction.user.id)
+    if not member:
+        return False
+
+    return any(role.id == STAFF_ROLE_ID for role in member.roles)
+
 # Load bot data
 def load_data():
     try:
@@ -323,7 +337,7 @@ class EmbedOptionsView(discord.ui.View):
             embed = create_embed_from_data(self.embed_data)
 
             # Validate embed has content
-            if not any([self.embed_data.get('title'), self.embed_data.get('description'), 
+            if not any([self.embed_data.get('title'), self.embed_data.get('description'),
                        self.embed_data.get('fields'), self.embed_data.get('image')]):
                 await interaction.response.send_message("❌ Embed must have at least a title, description, field, or image.", ephemeral=True)
                 return
@@ -351,10 +365,10 @@ class EmbedOptionsView(discord.ui.View):
 
             # Create button view if buttons exist
             button_view = create_embed_button_view(self.embed_data) if self.embed_data.get('buttons') else None
-            
+
             # Use followup to send the actual embed to avoid interaction timeout
             await interaction.followup.send(embed=embed, view=button_view)
-            
+
         except Exception as e:
             print(f"Error in send_embed: {e}")
             try:
@@ -379,7 +393,7 @@ class ImageModal(discord.ui.Modal, title="Add Image"):
             required=True,
             default=embed_data.get('image', '')
         )
-        
+
         # Add input to modal
         self.add_item(self.image_url)
 
@@ -404,7 +418,7 @@ class AuthorModal(discord.ui.Modal, title="Add Author"):
 
         # Get existing author data
         author = embed_data.get('author', {})
-        
+
         # Create text inputs with proper default values
         self.author_name = discord.ui.TextInput(
             label="Author Name",
@@ -835,7 +849,7 @@ def create_embed_button_view(embed_data):
                 import time
                 current_time = time.time()
                 user_id = interaction.user.id
-                
+
                 if user_id in self.user_cooldowns:
                     if current_time - self.user_cooldowns[user_id] < 2:  # 2 second cooldown per user
                         await interaction.response.send_message("⏱️ Please wait a moment before clicking again.", ephemeral=True)
@@ -897,6 +911,7 @@ class FieldManagerView(discord.ui.View):
         super().__init__(timeout=300)
         self.embed_data = embed_data
         self.editing_embed_id = editing_embed_id
+        self.selected_field_index = None
 
         # Create select menu for fields
         fields = embed_data.get('fields', [])
@@ -1094,11 +1109,16 @@ class EditEmbedSelectView(discord.ui.View):
         await interaction.response.send_modal(modal)
 
 # Slash Commands
-@bot.tree.command(name="create_embed", description="Create a custom embed message")
+@bot.tree.command(name="create_embed", description="[STAFF ONLY] Create a custom embed message")
 async def create_embed(interaction: discord.Interaction):
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Enhanced staff permission check
+        if not is_staff(interaction):
+            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
             return
 
         modal = EmbedModal()
@@ -1125,12 +1145,17 @@ async def create_embed(interaction: discord.Interaction):
         except:
             pass
 
-@bot.tree.command(name="edit_embed", description="Edit an existing embed")
+@bot.tree.command(name="edit_embed", description="[STAFF ONLY] Edit an existing embed")
 async def edit_embed(interaction: discord.Interaction):
     try:
         # Simplified guild check - just check if guild_id exists
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Enhanced staff permission check
+        if not is_staff(interaction):
+            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
             return
 
         data = load_data()
@@ -1161,11 +1186,16 @@ async def edit_embed(interaction: discord.Interaction):
         except:
             pass
 
-@bot.tree.command(name="list_embeds", description="List all stored embeds")
+@bot.tree.command(name="list_embeds", description="[STAFF ONLY] List all stored embeds")
 async def list_embeds(interaction: discord.Interaction):
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Enhanced staff permission check
+        if not is_staff(interaction):
+            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
             return
 
         data = load_data()
@@ -1218,11 +1248,16 @@ async def list_embeds(interaction: discord.Interaction):
         except:
             pass
 
-@bot.tree.command(name="spawnembed", description="Spawn a stored embed message")
+@bot.tree.command(name="spawnembed", description="[STAFF ONLY] Spawn a stored embed message")
 async def spawn_embed(interaction: discord.Interaction):
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Enhanced staff permission check
+        if not is_staff(interaction):
+            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
             return
 
         data = load_data()
@@ -1243,11 +1278,16 @@ async def spawn_embed(interaction: discord.Interaction):
         except:
             pass
 
-@bot.tree.command(name="delete_embed", description="Delete a stored embed message")
+@bot.tree.command(name="delete_embed", description="[STAFF ONLY] Delete a stored embed message")
 async def delete_embed(interaction: discord.Interaction, embed_id: str):
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Enhanced staff permission check
+        if not is_staff(interaction):
+            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
             return
 
         data = load_data()
