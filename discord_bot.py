@@ -13,19 +13,20 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Staff role ID
-STAFF_ROLE_ID = 1409695735829626942
+# Verification Key
+VERIFICATION_KEY = "ZpofeVerifiedU"
 
-def is_staff(interaction: discord.Interaction) -> bool:
-    """Check if the user has the staff role"""
-    if not interaction.guild:
-        return False
+# Store verified users (in-memory, will reset on bot restart)
+# For persistent storage, consider a database or a file.
+verified_users = set()
 
-    member = interaction.guild.get_member(interaction.user.id)
-    if not member:
-        return False
+def add_verified_user(user_id: int):
+    """Add a user to the verified list."""
+    verified_users.add(user_id)
 
-    return any(role.id == STAFF_ROLE_ID for role in member.roles)
+def is_verified(interaction: discord.Interaction) -> bool:
+    """Check if user is in the verified list."""
+    return interaction.user.id in verified_users
 
 # Load bot data
 def load_data():
@@ -90,6 +91,40 @@ async def on_message(message):
         return
 
     await bot.process_commands(message)
+
+class VerificationModal(discord.ui.Modal, title="Staff Verification Required"):
+    def __init__(self, original_interaction, command_name):
+        super().__init__()
+        self.original_interaction = original_interaction
+        self.command_name = command_name
+
+    key_input = discord.ui.TextInput(
+        label="Verification Key",
+        placeholder="Enter your staff verification key...",
+        max_length=50,
+        required=True
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        entered_key = str(self.key_input.value).strip()
+
+        if entered_key == VERIFICATION_KEY:
+            # Add user to verified list
+            add_verified_user(interaction.user.id)
+            await interaction.response.send_message("✅ **Verification Successful!** You now have staff access. Please run the command again.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ **Invalid Key:** Incorrect verification key entered. Access denied.", ephemeral=True)
+
+async def check_verification(interaction: discord.Interaction, command_name: str) -> bool:
+    """Check if user is verified, show verification modal if not"""
+    # Check if user is already verified
+    if is_verified(interaction):
+        return True
+
+    # Show verification modal
+    modal = VerificationModal(interaction, command_name)
+    await interaction.response.send_modal(modal)
+    return False
 
 class EmbedModal(discord.ui.Modal):
     def __init__(self, embed_data=None, editing_embed_id=None):
@@ -1116,9 +1151,8 @@ async def create_embed(interaction: discord.Interaction):
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Enhanced staff permission check
-        if not is_staff(interaction):
-            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
+        # Use verification check
+        if not await check_verification(interaction, "create_embed"):
             return
 
         modal = EmbedModal()
@@ -1153,9 +1187,8 @@ async def edit_embed(interaction: discord.Interaction):
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Enhanced staff permission check
-        if not is_staff(interaction):
-            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
+        # Use verification check
+        if not await check_verification(interaction, "edit_embed"):
             return
 
         data = load_data()
@@ -1193,9 +1226,8 @@ async def list_embeds(interaction: discord.Interaction):
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Enhanced staff permission check
-        if not is_staff(interaction):
-            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
+        # Use verification check
+        if not await check_verification(interaction, "list_embeds"):
             return
 
         data = load_data()
@@ -1255,9 +1287,8 @@ async def spawn_embed(interaction: discord.Interaction):
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Enhanced staff permission check
-        if not is_staff(interaction):
-            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
+        # Use verification check
+        if not await check_verification(interaction, "spawnembed"):
             return
 
         data = load_data()
@@ -1285,9 +1316,8 @@ async def delete_embed(interaction: discord.Interaction, embed_id: str):
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Enhanced staff permission check
-        if not is_staff(interaction):
-            await interaction.response.send_message("❌ **Access Denied:** This command is restricted to staff members only. You need the staff role to use embed commands.", ephemeral=True)
+        # Use verification check
+        if not await check_verification(interaction, "delete_embed"):
             return
 
         data = load_data()
