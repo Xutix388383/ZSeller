@@ -975,58 +975,7 @@ class EditEmbedSelectView(discord.ui.View):
         modal = EmbedModal(embed_data, embed_id)
         await interaction.response.send_modal(modal)
 
-# RIA Enrollment System - Command-based approach
-
-async def send_welcome_dm(member, role_type):
-    """Send welcome DM to member based on role type"""
-    if role_type == "ria":
-        embed = discord.Embed(
-            title="🎉 Welcome to RIA! 🎉",
-            description=f"We're glad to have you! To show your loyalty and represent the crew, please make sure to:\n\n🏳️ Set your flag to PURPLE 🏳️\n\nThis helps us recognize each other in the streets. Stay active, respect the crew, and enjoy the vibes!\n\n— RIA Leadership 💜",
-            color=0x800080,
-            timestamp=datetime.now()
-        )
-        embed.set_footer(text="RIA Enrollment System")
-    elif role_type == "staff":
-        embed = discord.Embed(
-            title="🎉 Welcome to the RIA Staff Team! 🎉",
-            description=f"Congratulations! You've been accepted into the RIA Staff Team. You now have additional responsibilities and privileges.\n\nPlease review the staff guidelines and contact leadership if you have any questions.\n\n— RIA Leadership 💜",
-            color=0x800080,
-            timestamp=datetime.now()
-        )
-        embed.set_footer(text="RIA Staff System")
-    elif role_type == "membership":
-        embed = discord.Embed(
-            title="🎫 RIA Membership Access Granted! 🎫",
-            description=f"You've been granted membership access! You now have access to member-only channels and features.\n\nEnjoy your membership benefits!\n\n— RIA Leadership 💜",
-            color=0x800080,
-            timestamp=datetime.now()
-        )
-        embed.set_footer(text="RIA Membership System")
-    else:
-        return "❌ Unknown role type"
-
-    try:
-        await member.send(embed=embed)
-        return "✅ Welcome message sent via DM"
-    except discord.Forbidden:
-        return "⚠️ Could not send DM (user has DMs disabled)"
-
-async def send_decline_dm(member):
-    """Send decline DM to member"""
-    embed = discord.Embed(
-        title="❌ RIA Enrollment Declined",
-        description=f"Unfortunately your enrollment into RIA has been declined at this time. You may reapply in the future.\n\nIf you have questions, please contact RIA leadership.\n\n— RIA Leadership",
-        color=0xff0000,
-        timestamp=datetime.now()
-    )
-    embed.set_footer(text="RIA Enrollment System")
-    
-    try:
-        await member.send(embed=embed)
-        return "✅ Decline message sent via DM"
-    except discord.Forbidden:
-        return "⚠️ Could not send DM (user has DMs disabled)"
+# Bot functionality continues here
 
 # Slash Commands
 @bot.tree.command(name="create_embed", description="Create a custom embed message")
@@ -1210,206 +1159,666 @@ async def delete_embed(interaction: discord.Interaction, embed_id: str):
 
 
 
-@bot.tree.command(name="ria_accept", description="Accept a member into RIA or show members without RIA role")
-async def ria_accept(interaction: discord.Interaction, member: discord.Member = None):
-    """Accept a member into RIA or show all members without RIA role"""
+
+
+# Membership System Commands
+
+# Membership configuration - you can modify these
+MEMBERSHIP_CONFIG = {
+    "ria_premium": {
+        "name": "RIA Premium Membership",
+        "price": "$3/month",
+        "role_id": 1411525587474059264,  # RIA Premium role ID
+        "benefits": [
+            "🎁 EXCLUSIVE Giveaways",
+            "👕 RARE RIA PREMIUM SHIRT (IRL or in-server)",
+            "🔒 HIDDEN Channel Access (Premium Members ONLY)",
+            "⭐ Special Role in the server",
+            "📝 ANY NAME OF YOUR CHOICE in the Discord!"
+        ],
+        "emoji": "💎",
+        "signup_url": "https://docs.google.com/forms/d/e/1FAIpQLSckQudNZqdY1AF_Xco-KBueeQ_aa3R1XWEtR5aUKJM-KZmqVw/viewform"
+    }
+}
+
+@bot.tree.command(name="membership", description="View available memberships")
+async def membership(interaction: discord.Interaction):
+    """Display available membership tiers"""
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Get the RIA role (ID: 1409683503100067951)
-        ria_role = interaction.guild.get_role(1409683503100067951)
-        if not ria_role:
-            await interaction.response.send_message("❌ RIA role not found!", ephemeral=True)
-            return
+        embed = discord.Embed(
+            title="🌟 Server Memberships",
+            description="Choose your membership tier and unlock exclusive benefits!",
+            color=0xFFD700
+        )
 
-        # If no member specified, show all members without RIA role
-        if member is None:
-            members_without_ria = []
-            for guild_member in interaction.guild.members:
-                if not guild_member.bot and ria_role not in guild_member.roles:
-                    members_without_ria.append(guild_member)
-
-            if not members_without_ria:
-                await interaction.response.send_message("✅ All members already have the RIA role!", ephemeral=True)
-                return
-
-            # Create embed showing members without RIA role
-            embed = discord.Embed(
-                title="👥 Members Without RIA Role",
-                description=f"Found **{len(members_without_ria)}** members without the RIA role:",
-                color=0xff9900
+        for tier_id, config in MEMBERSHIP_CONFIG.items():
+            benefits_text = "\n".join(config["benefits"])
+            embed.add_field(
+                name=f"{config['emoji']} {config['name']} - {config['price']}",
+                value=f"```{benefits_text}```",
+                inline=False
             )
 
-            # Split members into chunks for fields (Discord has field limits)
-            chunk_size = 10
-            for i in range(0, len(members_without_ria), chunk_size):
-                chunk = members_without_ria[i:i+chunk_size]
-                member_list = "\n".join([f"• {member.mention} ({member.display_name})" for member in chunk])
-                
-                field_name = f"Members {i+1}-{min(i+chunk_size, len(members_without_ria))}"
-                embed.add_field(name=field_name, value=member_list, inline=False)
+        embed.set_footer(text="Use /purchase_membership to buy a membership!")
+        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
 
-            embed.set_footer(text="Use /ria_accept @member to accept a specific member")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-            return
-
-        # If member specified, accept them into RIA
-        if ria_role in member.roles:
-            await interaction.response.send_message(f"❌ {member.mention} already has the RIA role!", ephemeral=True)
-            return
-
-        try:
-            await member.add_roles(ria_role)
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to assign roles!", ephemeral=True)
-            return
-
-        # Send welcome DM
-        dm_status = await send_welcome_dm(member, "ria")
-        
-        await interaction.response.send_message(f"✅ Successfully enrolled {member.mention} into RIA!\n{dm_status}", ephemeral=True)
+        # Create purchase buttons
+        view = MembershipPurchaseView()
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     except Exception as e:
-        print(f"Error in ria_accept: {e}")
+        print(f"Error in membership command: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
-@bot.tree.command(name="ria_decline", description="Decline a member's RIA enrollment")
-async def ria_decline(interaction: discord.Interaction, member: discord.Member):
-    """Decline a member's RIA enrollment"""
+@bot.tree.command(name="purchase_membership", description="Purchase a membership tier")
+@discord.app_commands.describe(tier="Choose membership tier")
+@discord.app_commands.choices(tier=[
+    discord.app_commands.Choice(name="💎 RIA Premium Membership", value="ria_premium")
+])
+async def purchase_membership(interaction: discord.Interaction, tier: str):
+    """Handle membership purchase"""
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Send decline DM
-        dm_status = await send_decline_dm(member)
+        if tier not in MEMBERSHIP_CONFIG:
+            await interaction.response.send_message("❌ Invalid membership tier!", ephemeral=True)
+            return
+
+        config = MEMBERSHIP_CONFIG[tier]
         
-        await interaction.response.send_message(f"❌ Declined enrollment for {member.mention}.\n{dm_status}", ephemeral=True)
+        # Create purchase confirmation embed
+        embed = discord.Embed(
+            title=f"{config['emoji']} Purchase {config['name']}",
+            description=f"**Price:** {config['price']}\n\n**Benefits Include:**",
+            color=0x00FF00
+        )
+
+        benefits_text = "\n".join(config["benefits"])
+        embed.add_field(name="Your Benefits", value=benefits_text, inline=False)
+        
+        embed.add_field(
+            name="💳 Sign Up Now!",
+            value=f"**[Click here to sign up for ONLY $3/month!]({config.get('signup_url', '#')})**\n\n```To complete your purchase:\n1. Fill out the signup form\n2. Submit proof of payment\n3. Get immediate access!```",
+            inline=False
+        )
+
+        embed.add_field(
+            name="🚀 Get Started",
+            value="Don't forget to submit proof of payment at the end to get immediate access!\n**Elevate your RIA experience today!**",
+            inline=False
+        )
+        
+        embed.set_footer(text="Thank you for supporting our server!")
+
+        # Create confirmation view
+        view = PurchaseConfirmationView(tier, f"txn_{interaction.user.id}_{int(datetime.now().timestamp())}")
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     except Exception as e:
-        print(f"Error in ria_decline: {e}")
+        print(f"Error in purchase_membership: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
-@bot.tree.command(name="ria_staff", description="Add a member to RIA Staff Team")
-async def ria_staff(interaction: discord.Interaction, member: discord.Member):
-    """Add a member to RIA Staff Team"""
+@bot.tree.command(name="grant_membership", description="Grant membership to a user (Staff Only)")
+@discord.app_commands.describe(
+    member="The member to grant membership to",
+    tier="Membership tier to grant"
+)
+@discord.app_commands.choices(tier=[
+    discord.app_commands.Choice(name="💎 RIA Premium Membership", value="ria_premium")
+])
+async def grant_membership(interaction: discord.Interaction, member: discord.Member, tier: str):
+    """Grant membership to a user (staff command)"""
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        # Add the Staff role (ID: 1409695735829626942)
-        staff_role = interaction.guild.get_role(1409695735829626942)
-        if not staff_role:
-            await interaction.response.send_message("❌ Staff role not found!", ephemeral=True)
+        # Check if user has permission (you can modify this check)
+        if not interaction.user.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ You don't have permission to grant memberships!", ephemeral=True)
             return
 
-        try:
-            await member.add_roles(staff_role)
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to assign staff roles!", ephemeral=True)
+        if tier not in MEMBERSHIP_CONFIG:
+            await interaction.response.send_message("❌ Invalid membership tier!", ephemeral=True)
             return
 
-        # Send staff welcome DM
-        dm_status = await send_welcome_dm(member, "staff")
+        config = MEMBERSHIP_CONFIG[tier]
         
-        await interaction.response.send_message(f"✅ Successfully added {member.mention} to the Staff Team!\n{dm_status}", ephemeral=True)
-
-    except Exception as e:
-        print(f"Error in ria_staff: {e}")
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
-
-@bot.tree.command(name="ria_membership", description="Grant membership access to a member")
-async def ria_membership(interaction: discord.Interaction, member: discord.Member):
-    """Grant membership access to a member"""
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+        # Check if role is configured
+        if not config["role_id"]:
+            await interaction.response.send_message("❌ Membership role not configured! Please set the role ID in the bot configuration.", ephemeral=True)
             return
 
-        # Add the Membership role (ID: 1411525587474059264)
-        membership_role = interaction.guild.get_role(1411525587474059264)
-        if not membership_role:
+        role = interaction.guild.get_role(config["role_id"])
+        if not role:
             await interaction.response.send_message("❌ Membership role not found!", ephemeral=True)
             return
 
-        try:
-            await member.add_roles(membership_role)
-        except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to assign membership roles!", ephemeral=True)
+        # Check if user already has the role
+        if role in member.roles:
+            await interaction.response.send_message(f"❌ {member.mention} already has {config['name']}!", ephemeral=True)
             return
 
-        # Send membership welcome DM
-        dm_status = await send_welcome_dm(member, "membership")
-        
-        await interaction.response.send_message(f"✅ Successfully granted membership access to {member.mention}!\n{dm_status}", ephemeral=True)
+        # Grant the role
+        try:
+            await member.add_roles(role)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ I don't have permission to assign this role!", ephemeral=True)
+            return
+
+        # Create success embed
+        embed = discord.Embed(
+            title="✅ Membership Granted!",
+            description=f"{member.mention} has been granted **{config['name']}**!",
+            color=0x00FF00
+        )
+        embed.add_field(name="Granted by", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Membership Tier", value=f"{config['emoji']} {config['name']}", inline=True)
+
+        await interaction.response.send_message(embed=embed)
+
+        # Send welcome DM to the member
+        try:
+            dm_embed = discord.Embed(
+                title=f"🎉 Welcome to {config['name']}!",
+                description=f"Congratulations! You now have access to exclusive member benefits in **{interaction.guild.name}**.",
+                color=0xFFD700
+            )
+            benefits_text = "\n".join(config["benefits"])
+            dm_embed.add_field(name="Your Benefits", value=benefits_text, inline=False)
+            dm_embed.set_footer(text="Thank you for being a valued member!")
+
+            await member.send(embed=dm_embed)
+        except discord.Forbidden:
+            pass  # User has DMs disabled
 
     except Exception as e:
-        print(f"Error in ria_membership: {e}")
+        print(f"Error in grant_membership: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
-@bot.tree.command(name="ria_remove", description="Remove RIA roles from a member")
-async def ria_remove(interaction: discord.Interaction, member: discord.Member, role_type: str):
-    """Remove RIA roles from a member"""
+@bot.tree.command(name="revoke_membership", description="Revoke membership from a user (Staff Only)")
+@discord.app_commands.describe(
+    member="The member to revoke membership from",
+    tier="Membership tier to revoke"
+)
+@discord.app_commands.choices(tier=[
+    discord.app_commands.Choice(name="💎 RIA Premium Membership", value="ria_premium")
+])
+async def revoke_membership(interaction: discord.Interaction, member: discord.Member, tier: str):
+    """Revoke membership from a user (staff command)"""
     try:
         if not interaction.guild_id:
             await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
             return
 
-        role_id = None
-        role_name = ""
-        
-        if role_type.lower() == "ria":
-            role_id = 1409683503100067951
-            role_name = "RIA"
-        elif role_type.lower() == "staff":
-            role_id = 1409695735829626942
-            role_name = "Staff"
-        elif role_type.lower() == "membership":
-            role_id = 1411525587474059264
-            role_name = "Membership"
-        else:
-            await interaction.response.send_message("❌ Invalid role type! Use: ria, staff, or membership", ephemeral=True)
+        # Check if user has permission
+        if not interaction.user.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ You don't have permission to revoke memberships!", ephemeral=True)
             return
 
-        role = interaction.guild.get_role(role_id)
+        if tier not in MEMBERSHIP_CONFIG:
+            await interaction.response.send_message("❌ Invalid membership tier!", ephemeral=True)
+            return
+
+        config = MEMBERSHIP_CONFIG[tier]
+        
+        if not config["role_id"]:
+            await interaction.response.send_message("❌ Membership role not configured!", ephemeral=True)
+            return
+
+        role = interaction.guild.get_role(config["role_id"])
         if not role:
-            await interaction.response.send_message(f"❌ {role_name} role not found!", ephemeral=True)
+            await interaction.response.send_message("❌ Membership role not found!", ephemeral=True)
             return
 
         if role not in member.roles:
-            await interaction.response.send_message(f"❌ {member.mention} doesn't have the {role_name} role!", ephemeral=True)
+            await interaction.response.send_message(f"❌ {member.mention} doesn't have {config['name']}!", ephemeral=True)
             return
 
+        # Remove the role
         try:
             await member.remove_roles(role)
-            await interaction.response.send_message(f"✅ Successfully removed {role_name} role from {member.mention}!", ephemeral=True)
         except discord.Forbidden:
-            await interaction.response.send_message("❌ I don't have permission to remove roles!", ephemeral=True)
+            await interaction.response.send_message("❌ I don't have permission to remove this role!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="🗑️ Membership Revoked",
+            description=f"{config['name']} has been revoked from {member.mention}.",
+            color=0xFF6B6B
+        )
+        embed.add_field(name="Revoked by", value=interaction.user.mention, inline=True)
+
+        await interaction.response.send_message(embed=embed)
 
     except Exception as e:
-        print(f"Error in ria_remove: {e}")
+        print(f"Error in revoke_membership: {e}")
         try:
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="my_membership", description="Check your current membership status")
+async def my_membership(interaction: discord.Interaction):
+    """Check user's current membership status"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        user_memberships = []
+        
+        for tier_id, config in MEMBERSHIP_CONFIG.items():
+            if config["role_id"]:
+                role = interaction.guild.get_role(config["role_id"])
+                if role and role in interaction.user.roles:
+                    user_memberships.append((tier_id, config))
+
+        embed = discord.Embed(
+            title="👤 Your Membership Status",
+            color=0x0099FF
+        )
+
+        if user_memberships:
+            embed.description = "🎉 Thank you for being a valued member!"
+            
+            for tier_id, config in user_memberships:
+                benefits_text = "\n".join(config["benefits"])
+                embed.add_field(
+                    name=f"{config['emoji']} {config['name']}",
+                    value=f"```{benefits_text}```",
+                    inline=False
+                )
+        else:
+            embed.description = "You don't have any active memberships."
+            embed.add_field(
+                name="💡 Want to become a member?",
+                value="Use `/membership` to view available tiers and `/purchase_membership` to get started!",
+                inline=False
+            )
+
+        embed.set_thumbnail(url=interaction.user.display_avatar.url)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in my_membership: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        except:
+            pass
+
+class MembershipPurchaseView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=300)
+
+    @discord.ui.button(label="💎 Buy RIA Premium", style=discord.ButtonStyle.primary)
+    async def buy_ria_premium(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await purchase_membership.callback(interaction, "ria_premium")
+
+class PurchaseConfirmationView(discord.ui.View):
+    def __init__(self, tier, transaction_id):
+        super().__init__(timeout=300)
+        self.tier = tier
+        self.transaction_id = transaction_id
+
+    @discord.ui.button(label="📝 Sign Up Now", style=discord.ButtonStyle.primary, emoji="🚀")
+    async def signup_now(self, interaction: discord.Interaction, button: discord.ui.Button):
+        config = MEMBERSHIP_CONFIG[self.tier]
+        signup_url = config.get('signup_url', '#')
+        
+        embed = discord.Embed(
+            title="🚀 Complete Your Membership!",
+            description=f"**Click the link below to sign up for RIA Premium:**\n\n🔗 **[SIGN UP FOR ONLY $3/MONTH!]({signup_url})**",
+            color=0x00FF00
+        )
+        embed.add_field(
+            name="📋 What to do:",
+            value="1. Click the signup link above\n2. Fill out the form completely\n3. Submit proof of payment\n4. Get immediate access to all benefits!",
+            inline=False
+        )
+        embed.set_footer(text="Elevate your RIA experience today!")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @discord.ui.button(label="📞 Contact Staff", style=discord.ButtonStyle.secondary)
+    async def contact_staff(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="📞 Need Help?",
+            description="If you need assistance with your membership purchase, contact any staff member.",
+            color=0x0099FF
+        )
+        embed.add_field(name="How to Contact", value="• Send a DM to any staff member\n• Use a support ticket\n• Tag staff in an appropriate channel", inline=False)
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="membership_panel", description="Create a membership panel for users to purchase")
+async def membership_panel(interaction: discord.Interaction):
+    """Create and send a membership panel embed"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Check if user has permission to create panels
+        if not interaction.user.guild_permissions.manage_messages:
+            await interaction.response.send_message("❌ You need Manage Messages permission to create membership panels!", ephemeral=True)
+            return
+
+        config = MEMBERSHIP_CONFIG["ria_premium"]
+        
+        # Create the main membership panel embed
+        embed = discord.Embed(
+            title="🌟 RIA Premium Membership",
+            description="**Sign up now for ONLY $3/month and unlock these EXCLUSIVE benefits:**",
+            color=0xFFD700
+        )
+        
+        # Add benefits as fields
+        benefits_text = "\n".join(config["benefits"])
+        embed.add_field(
+            name="💎 Exclusive Benefits",
+            value=benefits_text,
+            inline=False
+        )
+        
+        embed.add_field(
+            name="💰 Price",
+            value=f"**{config['price']}**",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🚀 Get Started",
+            value=f"[Sign Up Here!]({config['signup_url']})",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="📋 Important",
+            value="Don't forget to submit proof of payment at the end to get immediate access!",
+            inline=False
+        )
+        
+        embed.set_footer(text="Elevate your RIA experience today!")
+        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
+        
+        # Create view with purchase button
+        class MembershipPanelView(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=None)  # Persistent view
+                
+            @discord.ui.button(label="💎 Buy RIA Premium - $3/month", style=discord.ButtonStyle.primary, emoji="🛒")
+            async def purchase_premium(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+                config = MEMBERSHIP_CONFIG["ria_premium"]
+                
+                # Check if user already has the role
+                premium_role = button_interaction.guild.get_role(config["role_id"])
+                if premium_role and premium_role in button_interaction.user.roles:
+                    await button_interaction.response.send_message("✅ You already have RIA Premium membership!", ephemeral=True)
+                    return
+                
+                # Create purchase embed
+                purchase_embed = discord.Embed(
+                    title="💎 Purchase RIA Premium Membership",
+                    description=f"**Ready to upgrade your RIA experience?**\n\nPrice: **{config['price']}**",
+                    color=0x00FF00
+                )
+                
+                purchase_embed.add_field(
+                    name="🎁 What You'll Get",
+                    value="\n".join(config["benefits"]),
+                    inline=False
+                )
+                
+                purchase_embed.add_field(
+                    name="💳 Complete Your Purchase",
+                    value=f"**[🔗 Sign Up Now for ONLY $3/month!]({config['signup_url']})**\n\n```Steps to complete:\n1. Fill out the signup form\n2. Submit proof of payment\n3. Get immediate access!```",
+                    inline=False
+                )
+                
+                purchase_embed.set_footer(text="Elevate your RIA experience today!")
+                
+                await button_interaction.response.send_message(embed=purchase_embed, ephemeral=True)
+            
+            @discord.ui.button(label="ℹ️ Check My Membership", style=discord.ButtonStyle.secondary)
+            async def check_membership(self, button_interaction: discord.Interaction, button: discord.ui.Button):
+                await my_membership.callback(button_interaction)
+
+        view = MembershipPanelView()
+        await interaction.response.send_message("✅ Creating membership panel...", ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view)
+
+    except Exception as e:
+        print(f"Error in membership_panel: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="membership_stats", description="View membership statistics (Admin Only)")
+async def membership_stats(interaction: discord.Interaction):
+    """View membership statistics for admins"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Check admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ This command requires Administrator permissions!", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        config = MEMBERSHIP_CONFIG["ria_premium"]
+        
+        # Get the premium role
+        premium_role = guild.get_role(config["role_id"])
+        if not premium_role:
+            await interaction.response.send_message("❌ Premium membership role not found!", ephemeral=True)
+            return
+
+        # Count members with premium role
+        premium_members = [member for member in guild.members if premium_role in member.roles and not member.bot]
+        total_members = len([member for member in guild.members if not member.bot])
+        
+        # Calculate statistics
+        premium_percentage = (len(premium_members) / total_members * 100) if total_members > 0 else 0
+        
+        embed = discord.Embed(
+            title="📊 Membership Statistics",
+            description=f"Statistics for **{guild.name}**",
+            color=0x0099FF
+        )
+        
+        embed.add_field(
+            name="💎 RIA Premium Members",
+            value=f"**{len(premium_members)}** members\n({premium_percentage:.1f}% of server)",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="👥 Total Members",
+            value=f"**{total_members}** members",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="💰 Monthly Revenue",
+            value=f"**${len(premium_members) * 3}** estimated",
+            inline=True
+        )
+        
+        # Show recent premium members (last 10)
+        if premium_members:
+            recent_members = sorted(premium_members, key=lambda m: m.joined_at or datetime.min, reverse=True)[:10]
+            members_list = "\n".join([f"• {member.mention}" for member in recent_members])
+            embed.add_field(
+                name="🔥 Recent Premium Members",
+                value=members_list,
+                inline=False
+            )
+        
+        embed.set_footer(text=f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in membership_stats: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="list_premium_members", description="List all premium members (Admin Only)")
+async def list_premium_members(interaction: discord.Interaction):
+    """List all premium members for admins"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Check admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ This command requires Administrator permissions!", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        config = MEMBERSHIP_CONFIG["ria_premium"]
+        
+        # Get the premium role
+        premium_role = guild.get_role(config["role_id"])
+        if not premium_role:
+            await interaction.response.send_message("❌ Premium membership role not found!", ephemeral=True)
+            return
+
+        # Get all premium members
+        premium_members = [member for member in guild.members if premium_role in member.roles and not member.bot]
+        
+        if not premium_members:
+            await interaction.response.send_message("No premium members found.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title="💎 RIA Premium Members",
+            description=f"Total Premium Members: **{len(premium_members)}**",
+            color=0xFFD700
+        )
+
+        # Split members into chunks of 20 for multiple fields
+        chunk_size = 20
+        for i in range(0, len(premium_members), chunk_size):
+            chunk = premium_members[i:i+chunk_size]
+            member_list = "\n".join([f"• {member.mention} ({member.display_name})" for member in chunk])
+            
+            field_name = f"Members {i+1}-{min(i+chunk_size, len(premium_members))}"
+            embed.add_field(name=field_name, value=member_list, inline=False)
+
+        embed.set_footer(text=f"Use /grant_membership or /revoke_membership to manage members")
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in list_premium_members: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        except:
+            pass
+
+@bot.tree.command(name="membership_audit", description="Audit membership permissions and setup (Admin Only)")
+async def membership_audit(interaction: discord.Interaction):
+    """Audit membership system for admins"""
+    try:
+        if not interaction.guild_id:
+            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
+            return
+
+        # Check admin permissions
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ This command requires Administrator permissions!", ephemeral=True)
+            return
+
+        guild = interaction.guild
+        config = MEMBERSHIP_CONFIG["ria_premium"]
+        
+        embed = discord.Embed(
+            title="🔍 Membership System Audit",
+            description="System status and configuration check",
+            color=0x0099FF
+        )
+        
+        # Check premium role
+        premium_role = guild.get_role(config["role_id"])
+        if premium_role:
+            embed.add_field(
+                name="✅ Premium Role",
+                value=f"**{premium_role.name}** (ID: {premium_role.id})\nPosition: {premium_role.position}\nMembers: {len(premium_role.members)}",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name="❌ Premium Role",
+                value=f"Role ID {config['role_id']} not found!",
+                inline=False
+            )
+        
+        # Check bot permissions
+        bot_member = guild.get_member(bot.user.id)
+        can_manage_roles = bot_member.guild_permissions.manage_roles if bot_member else False
+        can_send_messages = bot_member.guild_permissions.send_messages if bot_member else False
+        
+        permissions_status = "✅" if (can_manage_roles and can_send_messages) else "⚠️"
+        embed.add_field(
+            name=f"{permissions_status} Bot Permissions",
+            value=f"Manage Roles: {'✅' if can_manage_roles else '❌'}\nSend Messages: {'✅' if can_send_messages else '❌'}",
+            inline=True
+        )
+        
+        # Check signup URL
+        url_status = "✅" if config.get('signup_url') and config['signup_url'] != '#' else "⚠️"
+        embed.add_field(
+            name=f"{url_status} Signup URL",
+            value="Configured" if url_status == "✅" else "Not configured",
+            inline=True
+        )
+        
+        # Add configuration summary
+        embed.add_field(
+            name="⚙️ Configuration",
+            value=f"**Price:** {config['price']}\n**Benefits:** {len(config['benefits'])} configured",
+            inline=False
+        )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    except Exception as e:
+        print(f"Error in membership_audit: {e}")
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
 
