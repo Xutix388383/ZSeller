@@ -23,17 +23,11 @@ def load_data():
                 data['stored_embeds'] = {}
             if 'embed_counter' not in data:
                 data['embed_counter'] = 1
-            if 'automod_words' not in data:
-                data['automod_words'] = []
-            if 'automod_enabled' not in data:
-                data['automod_enabled'] = True
             return data
     except (FileNotFoundError, json.JSONDecodeError):
         default_data = {
             "stored_embeds": {},
-            "embed_counter": 1,
-            "automod_words": [],
-            "automod_enabled": True
+            "embed_counter": 1
         }
         save_data(default_data)
         return default_data
@@ -81,70 +75,62 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    # Auto-moderation
-    data = load_data()
-    if data.get('automod_enabled', True) and data.get('automod_words'):
-        content_lower = message.content.lower()
-        for word in data['automod_words']:
-            if word.lower() in content_lower:
-                try:
-                    await message.delete()
-                    await message.channel.send(f"{message.author.mention}, your message was removed for containing prohibited content.", delete_after=5)
-                    print(f"Auto-deleted message from {message.author}: {message.content}")
-                except discord.Forbidden:
-                    print(f"No permission to delete message from {message.author}")
-                break
-
     await bot.process_commands(message)
 
-class EmbedModal(discord.ui.Modal, title="Create Embed"):
+class EmbedModal(discord.ui.Modal):
     def __init__(self, embed_data=None, editing_embed_id=None):
-        super().__init__()
+        super().__init__(title="Create Embed")
         self.embed_data = embed_data or {}
         self.editing_embed_id = editing_embed_id
 
-        # Pre-fill if editing
-        self.title_input.default = self.embed_data.get('title', '')
-        self.description_input.default = self.embed_data.get('description', '')
-        self.color_input.default = self.embed_data.get('color', '')
-        self.footer_input.default = self.embed_data.get('footer', '')
-        self.thumbnail_input.default = self.embed_data.get('thumbnail', '')
+        # Create text inputs
+        self.title_input = discord.ui.TextInput(
+            label="Embed Title",
+            placeholder="Enter the embed title...",
+            max_length=256,
+            required=False,
+            default=self.embed_data.get('title', '')
+        )
 
-    title_input = discord.ui.TextInput(
-        label="Embed Title",
-        placeholder="Enter the embed title...",
-        max_length=256,
-        required=False
-    )
+        self.description_input = discord.ui.TextInput(
+            label="Embed Description",
+            placeholder="Enter the embed description...",
+            style=discord.TextStyle.paragraph,
+            max_length=4000,
+            required=False,
+            default=self.embed_data.get('description', '')
+        )
 
-    description_input = discord.ui.TextInput(
-        label="Embed Description",
-        placeholder="Enter the embed description...",
-        style=discord.TextStyle.paragraph,
-        max_length=4000,
-        required=False
-    )
+        self.color_input = discord.ui.TextInput(
+            label="Embed Color (hex)",
+            placeholder="e.g., #FF0000 or 0xFF0000",
+            max_length=10,
+            required=False,
+            default=self.embed_data.get('color', '')
+        )
 
-    color_input = discord.ui.TextInput(
-        label="Embed Color (hex)",
-        placeholder="e.g., #FF0000 or 0xFF0000",
-        max_length=10,
-        required=False
-    )
+        self.footer_input = discord.ui.TextInput(
+            label="Footer Text",
+            placeholder="Enter footer text...",
+            max_length=2048,
+            required=False,
+            default=self.embed_data.get('footer', '')
+        )
 
-    footer_input = discord.ui.TextInput(
-        label="Footer Text",
-        placeholder="Enter footer text...",
-        max_length=2048,
-        required=False
-    )
+        self.thumbnail_input = discord.ui.TextInput(
+            label="Thumbnail URL",
+            placeholder="Enter image URL for thumbnail...",
+            max_length=2048,
+            required=False,
+            default=self.embed_data.get('thumbnail', '')
+        )
 
-    thumbnail_input = discord.ui.TextInput(
-        label="Thumbnail URL",
-        placeholder="Enter image URL for thumbnail...",
-        max_length=2048,
-        required=False
-    )
+        # Add inputs to modal
+        self.add_item(self.title_input)
+        self.add_item(self.description_input)
+        self.add_item(self.color_input)
+        self.add_item(self.footer_input)
+        self.add_item(self.thumbnail_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         embed_data = {
@@ -1222,66 +1208,7 @@ async def delete_embed(interaction: discord.Interaction, embed_id: str):
         except:
             pass
 
-@bot.tree.command(name="automod", description="Manage auto-moderation settings")
-async def automod(interaction: discord.Interaction, action: str, word: str = None):
-    try:
-        if not interaction.guild_id:
-            await interaction.response.send_message("❌ This command can only be used in a server.", ephemeral=True)
-            return
 
-        data = load_data()
-
-        if action.lower() == "add" and word:
-            if word.lower() not in [w.lower() for w in data['automod_words']]:
-                data['automod_words'].append(word)
-                save_data(data)
-                await interaction.response.send_message(f"✅ Added '{word}' to auto-mod list", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"❌ '{word}' is already in the auto-mod list", ephemeral=True)
-
-        elif action.lower() == "remove" and word:
-            original_length = len(data['automod_words'])
-            data['automod_words'] = [w for w in data['automod_words'] if w.lower() != word.lower()]
-            if len(data['automod_words']) < original_length:
-                save_data(data)
-                await interaction.response.send_message(f"✅ Removed '{word}' from auto-mod list", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"❌ '{word}' was not found in the auto-mod list", ephemeral=True)
-
-        elif action.lower() == "list":
-            if data['automod_words']:
-                word_list = "\n".join([f"• {word}" for word in data['automod_words']])
-                embed = discord.Embed(
-                    title="🛡️ Auto-Mod Word List",
-                    description=word_list,
-                    color=0xff0000
-                )
-            else:
-                embed = discord.Embed(
-                    title="🛡️ Auto-Mod Word List",
-                    description="No words in the auto-mod list",
-                    color=0xff0000
-                )
-            embed.add_field(name="Status", value="Enabled" if data['automod_enabled'] else "Disabled", inline=True)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-
-        elif action.lower() == "toggle":
-            data['automod_enabled'] = not data['automod_enabled']
-            save_data(data)
-            status = "enabled" if data['automod_enabled'] else "disabled"
-            await interaction.response.send_message(f"✅ Auto-moderation {status}", ephemeral=True)
-
-        else:
-            await interaction.response.send_message("❌ Invalid action! Use: add, remove, list, or toggle", ephemeral=True)
-    except Exception as e:
-        print(f"Error in automod: {e}")
-        import traceback
-        traceback.print_exc()
-        try:
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ An error occurred while processing your request.", ephemeral=True)
-        except:
-            pass
 
 @bot.tree.command(name="ria_accept", description="Accept a member into RIA or show members without RIA role")
 async def ria_accept(interaction: discord.Interaction, member: discord.Member = None):
