@@ -40,5 +40,8 @@
       "review_notes": null
     }
   },
-  "ria_application_counter": 2
+  "ria_application_counter": 2,
+  "verified_users": [
+    1385239185006268457
+  ]
 }

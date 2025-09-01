@@ -21,7 +21,7 @@ def add_verified_user(user_id: int):
     data = load_data()
     if 'verified_users' not in data:
         data['verified_users'] = []
-    
+
     if user_id not in data['verified_users']:
         data['verified_users'].append(user_id)
         save_data(data)
@@ -123,196 +123,165 @@ async def check_verification(interaction: discord.Interaction) -> bool:
             pass
     return False
 
-class EmbedTypeSelectView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=300)
-
-    @discord.ui.button(label="Regular Embed", style=discord.ButtonStyle.primary, emoji="📝")
-    async def regular_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            modal = EmbedModal(embed_type="regular")
-            await interaction.response.send_modal(modal)
-        except Exception as e:
-            print(f"Error in regular_embed button: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Error opening embed creator.", ephemeral=True)
-
-    @discord.ui.button(label="Embed with Buttons", style=discord.ButtonStyle.success, emoji="🔘")
-    async def button_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            modal = EmbedModal(embed_type="button")
-            await interaction.response.send_modal(modal)
-        except Exception as e:
-            print(f"Error in button_embed button: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Error opening embed creator.", ephemeral=True)
-
 class EmbedModal(discord.ui.Modal, title="Create Advanced Embed"):
-    def __init__(self, embed_type="regular"):
+    def __init__(self):
         super().__init__()
-        self.embed_type = embed_type
+
+    embed_name_input = discord.ui.TextInput(
+        label="🏷️ Embed Name (for saving/referencing)",
+        placeholder="Enter a unique name for this embed...",
+        max_length=50,
+        required=True
+    )
 
     title_input = discord.ui.TextInput(
-        label="Embed Title",
-        placeholder="Enter the embed title...",
+        label="📝 Embed Title",
+        placeholder="Enter the main title for your embed...",
         max_length=256,
         required=False
     )
 
     description_input = discord.ui.TextInput(
-        label="Embed Description",
-        placeholder="Enter the embed description...",
+        label="📄 Embed Description",
+        placeholder="Enter detailed description or content...",
         style=discord.TextStyle.paragraph,
         max_length=4000,
         required=False
     )
 
     color_input = discord.ui.TextInput(
-        label="Embed Color (hex)",
-        placeholder="e.g., #FF0000",
+        label="🎨 Embed Color (hex)",
+        placeholder="e.g., #FF0000, #00FF00, #0099FF",
         max_length=10,
         required=False
     )
 
     image_input = discord.ui.TextInput(
-        label="Image URL (optional)",
-        placeholder="Enter image URL...",
+        label="🖼️ Main Image URL",
+        placeholder="Enter image URL (jpg, png, gif, webp)...",
         max_length=500,
         required=False
     )
 
     footer_input = discord.ui.TextInput(
-        label="Footer Text (optional)",
-        placeholder="Enter footer text...",
+        label="👣 Footer Text",
+        placeholder="Enter footer text (appears at bottom)...",
         max_length=2048,
         required=False
     )
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
+            embed_name = str(self.embed_name_input.value).strip()
+            
+            # Check if embed name already exists
+            data = load_data()
+            if embed_name in data.get('stored_embeds', {}):
+                await interaction.response.send_message(f"❌ **Embed name `{embed_name}` already exists!** Please choose a different name.", ephemeral=True)
+                return
+
             embed_data = {
+                'embed_name': embed_name,
                 'title': str(self.title_input.value) if self.title_input.value else None,
                 'description': str(self.description_input.value) if self.description_input.value else None,
                 'color': str(self.color_input.value) if self.color_input.value else None,
                 'image_url': str(self.image_input.value) if self.image_input.value else None,
-                'footer_text': str(self.footer_input.value) if self.footer_input.value else None,
-                'embed_type': self.embed_type
+                'footer_text': str(self.footer_input.value) if self.footer_input.value else None
             }
 
-            if self.embed_type == "button":
-                modal = ButtonConfigModal(embed_data)
-                await interaction.response.send_modal(modal)
-            else:
-                view = EmbedOptionsView(embed_data)
-                await interaction.response.send_message("Advanced embed created! Choose an option:", view=view, ephemeral=True)
+            # Show advanced options modal
+            modal = AdvancedEmbedModal(embed_data)
+            await interaction.response.send_modal(modal)
         except Exception as e:
             print(f"Error in EmbedModal submit: {e}")
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ Error creating embed.", ephemeral=True)
 
-class ButtonConfigModal(discord.ui.Modal, title="Configure Embed Buttons"):
+class AdvancedEmbedModal(discord.ui.Modal, title="Advanced Embed Options"):
     def __init__(self, embed_data):
         super().__init__()
         self.embed_data = embed_data
 
-    button1_label = discord.ui.TextInput(
-        label="Button 1 Label",
-        placeholder="Enter button 1 label...",
-        max_length=80,
-        required=True
-    )
-
-    button1_url = discord.ui.TextInput(
-        label="Button 1 URL",
-        placeholder="Enter button 1 URL...",
+    thumbnail_input = discord.ui.TextInput(
+        label="🖼️ Thumbnail URL (small image top-right)",
+        placeholder="Enter thumbnail URL (optional)...",
         max_length=500,
-        required=True
-    )
-
-    button2_label = discord.ui.TextInput(
-        label="Button 2 Label (optional)",
-        placeholder="Enter button 2 label...",
-        max_length=80,
         required=False
     )
 
-    button2_url = discord.ui.TextInput(
-        label="Button 2 URL (optional)",
-        placeholder="Enter button 2 URL...",
+    footer_icon_input = discord.ui.TextInput(
+        label="🔗 Footer Icon URL",
+        placeholder="Enter footer icon URL (optional)...",
         max_length=500,
+        required=False
+    )
+
+    author_name_input = discord.ui.TextInput(
+        label="👤 Author Name (appears at top)",
+        placeholder="Enter author name (optional)...",
+        max_length=256,
+        required=False
+    )
+
+    author_icon_input = discord.ui.TextInput(
+        label="👤 Author Icon URL",
+        placeholder="Enter author icon URL (optional)...",
+        max_length=500,
+        required=False
+    )
+
+    timestamp_input = discord.ui.TextInput(
+        label="⏰ Show Timestamp (yes/no)",
+        placeholder="Type 'yes' to show current timestamp...",
+        max_length=3,
         required=False
     )
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            buttons = []
-            
-            # Add first button (required)
-            buttons.append({
-                'label': str(self.button1_label.value),
-                'url': str(self.button1_url.value)
+            # Add advanced options to embed data
+            self.embed_data.update({
+                'thumbnail_url': str(self.thumbnail_input.value) if self.thumbnail_input.value else None,
+                'footer_icon_url': str(self.footer_icon_input.value) if self.footer_icon_input.value else None,
+                'author_name': str(self.author_name_input.value) if self.author_name_input.value else None,
+                'author_icon_url': str(self.author_icon_input.value) if self.author_icon_url.value else None,
+                'show_timestamp': str(self.timestamp_input.value).lower() == 'yes' if self.timestamp_input.value else False
             })
-            
-            # Add second button if provided
-            if self.button2_label.value and self.button2_url.value:
-                buttons.append({
-                    'label': str(self.button2_label.value),
-                    'url': str(self.button2_url.value)
-                })
 
-            self.embed_data['buttons'] = buttons
-            
-            view = EmbedOptionsView(self.embed_data)
-            await interaction.response.send_message("Button embed created! Choose an option:", view=view, ephemeral=True)
-        except Exception as e:
-            print(f"Error in ButtonConfigModal submit: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Error configuring buttons.", ephemeral=True)
-
-class EmbedOptionsView(discord.ui.View):
-    def __init__(self, embed_data):
-        super().__init__(timeout=300)
-        self.embed_data = embed_data
-
-    @discord.ui.button(label="Preview", style=discord.ButtonStyle.secondary, emoji="👁️")
-    async def preview_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
-            embed = create_embed_from_data(self.embed_data)
-            button_view = create_button_view_from_data(self.embed_data)
-            
-            if button_view:
-                await interaction.response.send_message("**Preview:**", embed=embed, view=button_view, ephemeral=True)
-            else:
-                await interaction.response.send_message("**Preview:**", embed=embed, ephemeral=True)
-        except Exception as e:
-            print(f"Error in preview_embed: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Error creating preview.", ephemeral=True)
-
-    @discord.ui.button(label="Save", style=discord.ButtonStyle.success, emoji="💾")
-    async def save_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        try:
+            # Auto-save the embed without button options
             data = load_data()
-            embed_id = f"embed_{data.get('embed_counter', 1)}"
-            data['stored_embeds'][embed_id] = self.embed_data.copy()
+            embed_name = self.embed_data.get('embed_name', f"embed_{data.get('embed_counter', 1)}")
+            
+            # Remove embed_name from the data before saving
+            embed_data_to_save = self.embed_data.copy()
+            if 'embed_name' in embed_data_to_save:
+                del embed_data_to_save['embed_name']
+            
+            data['stored_embeds'][embed_name] = embed_data_to_save
             data['embed_counter'] = data.get('embed_counter', 1) + 1
             save_data(data)
 
-            await interaction.response.send_message(f"✅ Embed saved! (ID: {embed_id})", ephemeral=True)
+            # Create and show preview of the saved embed
+            embed = create_embed_from_data(embed_data_to_save)
+            await interaction.response.send_message(f"✅ **Embed `{embed_name}` created and saved successfully!**\n**Preview:**", embed=embed, ephemeral=True)
         except Exception as e:
-            print(f"Error in save_embed: {e}")
+            print(f"Error in AdvancedEmbedModal submit: {e}")
             if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Error saving embed.", ephemeral=True)
+                await interaction.response.send_message("❌ Error creating advanced embed.", ephemeral=True)
+
+
 
 def create_embed_from_data(embed_data):
     embed = discord.Embed()
 
+    # Basic embed properties
     if embed_data.get('title'):
         embed.title = embed_data['title']
 
     if embed_data.get('description'):
         embed.description = embed_data['description']
 
+    # Color handling with better defaults
     if embed_data.get('color'):
         color_str = embed_data['color']
         if color_str.startswith('#'):
@@ -321,31 +290,37 @@ def create_embed_from_data(embed_data):
             embed.color = int(color_str, 16)
         except ValueError:
             embed.color = 0x0099ff
+    else:
+        embed.color = 0x0099FF  # Default blue color
 
+    # Advanced image options
     if embed_data.get('image_url'):
         embed.set_image(url=embed_data['image_url'])
 
+    if embed_data.get('thumbnail_url'):
+        embed.set_thumbnail(url=embed_data['thumbnail_url'])
+
+    # Advanced author section
+    if embed_data.get('author_name'):
+        author_icon = embed_data.get('author_icon_url')
+        embed.set_author(
+            name=embed_data['author_name'],
+            icon_url=author_icon if author_icon else None
+        )
+
+    # Advanced footer with icon support
     if embed_data.get('footer_text'):
-        embed.set_footer(text=embed_data['footer_text'])
+        footer_icon = embed_data.get('footer_icon_url')
+        embed.set_footer(
+            text=embed_data['footer_text'],
+            icon_url=footer_icon if footer_icon else None
+        )
+
+    # Timestamp support
+    if embed_data.get('show_timestamp'):
+        embed.timestamp = datetime.utcnow()
 
     return embed
-
-def create_button_view_from_data(embed_data):
-    """Create a view with buttons if the embed has button configuration"""
-    if embed_data.get('embed_type') != 'button' or not embed_data.get('buttons'):
-        return None
-    
-    view = discord.ui.View(timeout=None)
-    
-    for button_config in embed_data['buttons']:
-        button = discord.ui.Button(
-            label=button_config['label'],
-            url=button_config['url'],
-            style=discord.ButtonStyle.link
-        )
-        view.add_item(button)
-    
-    return view
 
 class SpawnEmbedSelectView(discord.ui.View):
     def __init__(self, stored_embeds):
@@ -353,11 +328,11 @@ class SpawnEmbedSelectView(discord.ui.View):
         self.stored_embeds = stored_embeds
 
         options = []
-        for embed_id, embed_data in stored_embeds.items():
+        for embed_name, embed_data in stored_embeds.items():
             title = embed_data.get('title', 'No title')
             options.append(discord.SelectOption(
-                label=f"{embed_id}: {title}"[:100],
-                value=embed_id
+                label=f"{embed_name}: {title}"[:100],
+                value=embed_name
             ))
 
         self.select_embed.options = options[:25]
@@ -365,34 +340,24 @@ class SpawnEmbedSelectView(discord.ui.View):
     @discord.ui.select(placeholder="Choose an embed to spawn...")
     async def select_embed(self, interaction: discord.Interaction, select: discord.ui.Select):
         try:
-            embed_id = select.values[0]
-            embed_data = self.stored_embeds[embed_id]
+            embed_name = select.values[0]
+            embed_data = self.stored_embeds[embed_name]
             embed = create_embed_from_data(embed_data)
-            button_view = create_button_view_from_data(embed_data)
-            
-            if button_view:
-                await interaction.response.send_message(embed=embed, view=button_view)
-            else:
-                await interaction.response.send_message(embed=embed)
+            await interaction.response.send_message(embed=embed)
         except Exception as e:
             print(f"Error in spawn embed select: {e}")
             if not interaction.response.is_done():
                 await interaction.response.send_message("❌ Error spawning embed.", ephemeral=True)
 
 # Slash Commands
-@bot.tree.command(name="create_embed", description="[STAFF ONLY] Create an advanced custom embed message")
+@bot.tree.command(name="create_embed", description="[STAFF ONLY] Create advanced embeds with images, footers, and styling")
 async def create_embed(interaction: discord.Interaction):
     try:
         if not await check_verification(interaction):
             return
 
-        try:
-            view = EmbedTypeSelectView()
-            await interaction.response.send_message("**Choose Embed Type:**", view=view, ephemeral=True)
-        except (discord.errors.NotFound, discord.errors.HTTPException) as e:
-            print(f"View error in create_embed: {e}")
-            if not interaction.response.is_done():
-                await interaction.response.send_message("❌ Session expired. Please try the command again.", ephemeral=True)
+        modal = EmbedModal()
+        await interaction.response.send_modal(modal)
     except Exception as e:
         print(f"Error in create_embed: {e}")
         try:
@@ -408,17 +373,21 @@ async def spawn_embed(interaction: discord.Interaction):
             return
 
         data = load_data()
+        stored_embeds = data.get('stored_embeds', {})
 
-        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
-            await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
+        if not stored_embeds or len(stored_embeds) == 0:
+            await interaction.response.send_message("📭 **No embeds stored!** Use `/create_embed` to create one first.", ephemeral=True)
             return
 
-        view = SpawnEmbedSelectView(data['stored_embeds'])
-        await interaction.response.send_message(f"**Select Embed to Spawn:**", view=view, ephemeral=True)
+        view = SpawnEmbedSelectView(stored_embeds)
+        await interaction.response.send_message("**Select Embed to Spawn:**", view=view, ephemeral=True)
     except Exception as e:
         print(f"Error in spawn_embed: {e}")
-        if not interaction.response.is_done():
-            await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+        except:
+            pass
 
 class EditEmbedSelectView(discord.ui.View):
     def __init__(self, stored_embeds):
@@ -426,11 +395,11 @@ class EditEmbedSelectView(discord.ui.View):
         self.stored_embeds = stored_embeds
 
         options = []
-        for embed_id, embed_data in stored_embeds.items():
+        for embed_name, embed_data in stored_embeds.items():
             title = embed_data.get('title', 'No title')
             options.append(discord.SelectOption(
-                label=f"{embed_id}: {title}"[:100],
-                value=embed_id
+                label=f"{embed_name}: {title}"[:100],
+                value=embed_name
             ))
 
         self.select_embed.options = options[:25]
@@ -438,9 +407,9 @@ class EditEmbedSelectView(discord.ui.View):
     @discord.ui.select(placeholder="Choose an embed to edit...")
     async def select_embed(self, interaction: discord.Interaction, select: discord.ui.Select):
         try:
-            embed_id = select.values[0]
-            embed_data = self.stored_embeds[embed_id]
-            modal = EditEmbedModal(embed_id, embed_data)
+            embed_name = select.values[0]
+            embed_data = self.stored_embeds[embed_name]
+            modal = EditEmbedModal(embed_name, embed_data)
             await interaction.response.send_modal(modal)
         except Exception as e:
             print(f"Error in edit embed select: {e}")
@@ -448,11 +417,11 @@ class EditEmbedSelectView(discord.ui.View):
                 await interaction.response.send_message("❌ Error loading embed for editing.", ephemeral=True)
 
 class EditEmbedModal(discord.ui.Modal, title="Edit Advanced Embed"):
-    def __init__(self, embed_id, embed_data):
+    def __init__(self, embed_name, embed_data):
         super().__init__()
-        self.embed_id = embed_id
+        self.embed_name = embed_name
         self.embed_data = embed_data
-        
+
         # Pre-fill the inputs with existing data
         self.title_input.default = embed_data.get('title', '')
         self.description_input.default = embed_data.get('description', '')
@@ -461,14 +430,14 @@ class EditEmbedModal(discord.ui.Modal, title="Edit Advanced Embed"):
         self.footer_input.default = embed_data.get('footer_text', '')
 
     title_input = discord.ui.TextInput(
-        label="Embed Title",
+        label="📝 Embed Title",
         placeholder="Enter the embed title...",
         max_length=256,
         required=False
     )
 
     description_input = discord.ui.TextInput(
-        label="Embed Description",
+        label="📄 Embed Description",
         placeholder="Enter the embed description...",
         style=discord.TextStyle.paragraph,
         max_length=4000,
@@ -476,21 +445,21 @@ class EditEmbedModal(discord.ui.Modal, title="Edit Advanced Embed"):
     )
 
     color_input = discord.ui.TextInput(
-        label="Embed Color (hex)",
-        placeholder="e.g., #FF0000",
+        label="🎨 Embed Color (hex)",
+        placeholder="e.g., #FF0000, #00FF00, #0099FF",
         max_length=10,
         required=False
     )
 
     image_input = discord.ui.TextInput(
-        label="Image URL (optional)",
-        placeholder="Enter image URL...",
+        label="🖼️ Main Image URL",
+        placeholder="Enter image URL (jpg, png, gif, webp)...",
         max_length=500,
         required=False
     )
 
     footer_input = discord.ui.TextInput(
-        label="Footer Text (optional)",
+        label="👣 Footer Text",
         placeholder="Enter footer text...",
         max_length=2048,
         required=False
@@ -504,17 +473,22 @@ class EditEmbedModal(discord.ui.Modal, title="Edit Advanced Embed"):
                 'color': str(self.color_input.value) if self.color_input.value else None,
                 'image_url': str(self.image_input.value) if self.image_input.value else None,
                 'footer_text': str(self.footer_input.value) if self.footer_input.value else None,
-                'embed_type': self.embed_data.get('embed_type', 'regular'),
-                'buttons': self.embed_data.get('buttons', [])
+                # Preserve existing advanced features
+                'thumbnail_url': self.embed_data.get('thumbnail_url'),
+                'footer_icon_url': self.embed_data.get('footer_icon_url'),
+                'author_name': self.embed_data.get('author_name'),
+                'author_icon_url': self.embed_data.get('author_icon_url'),
+                'show_timestamp': self.embed_data.get('show_timestamp', False)
             }
 
             # Save the updated embed
             data = load_data()
-            data['stored_embeds'][self.embed_id] = updated_embed_data
+            data['stored_embeds'][self.embed_name] = updated_embed_data
             save_data(data)
 
-            view = EmbedOptionsView(updated_embed_data)
-            await interaction.response.send_message(f"✅ Embed `{self.embed_id}` updated! Choose an option:", view=view, ephemeral=True)
+            # Create and show preview of the updated embed
+            embed = create_embed_from_data(updated_embed_data)
+            await interaction.response.send_message(f"✅ **Embed `{self.embed_name}` updated successfully!**\n**Preview:**", embed=embed, ephemeral=True)
         except Exception as e:
             print(f"Error in EditEmbedModal submit: {e}")
             if not interaction.response.is_done():
@@ -527,19 +501,14 @@ async def edit_embed(interaction: discord.Interaction):
             return
 
         data = load_data()
+        stored_embeds = data.get('stored_embeds', {})
 
-        if not data.get('stored_embeds') or len(data['stored_embeds']) == 0:
-            try:
-                await interaction.response.send_message("No embeds stored! Use `/create_embed` to create one first.", ephemeral=True)
-            except (discord.errors.NotFound, discord.errors.HTTPException):
-                pass
+        if not stored_embeds or len(stored_embeds) == 0:
+            await interaction.response.send_message("📭 **No embeds stored!** Use `/create_embed` to create one first.", ephemeral=True)
             return
 
-        try:
-            view = EditEmbedSelectView(data['stored_embeds'])
-            await interaction.response.send_message("**Select Embed to Edit:**", view=view, ephemeral=True)
-        except (discord.errors.NotFound, discord.errors.HTTPException) as e:
-            print(f"Response error in edit_embed: {e}")
+        view = EditEmbedSelectView(stored_embeds)
+        await interaction.response.send_message("**Select Embed to Edit:**", view=view, ephemeral=True)
     except Exception as e:
         print(f"Error in edit_embed: {e}")
         try:
@@ -547,6 +516,66 @@ async def edit_embed(interaction: discord.Interaction):
                 await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
         except:
             pass
+
+@bot.tree.command(name="delete_embed", description="[STAFF ONLY] Delete a stored embed by name")
+async def delete_embed(interaction: discord.Interaction, embed_name: str):
+    try:
+        if not await check_verification(interaction):
+            return
+
+        data = load_data()
+        stored_embeds = data.get('stored_embeds', {})
+
+        if not stored_embeds or len(stored_embeds) == 0:
+            await interaction.response.send_message("📭 **No embeds have been created yet!** Use `/create_embed` to create your first embed.", ephemeral=True)
+            return
+
+        # Check if the embed exists
+        if embed_name not in stored_embeds:
+            available_embeds = list(stored_embeds.keys())
+            embed_list = ", ".join([f"`{name}`" for name in available_embeds])
+            await interaction.response.send_message(
+                f"❌ **Embed `{embed_name}` not found!**\n\n**Available embeds:** {embed_list}",
+                ephemeral=True
+            )
+            return
+
+        # Show confirmation
+        view = ConfirmDeleteView(embed_name)
+        await interaction.response.send_message(
+            f"⚠️ **Are you sure you want to delete embed `{embed_name}`?**\nThis action cannot be undone!",
+            view=view,
+            ephemeral=True
+        )
+    except Exception as e:
+        print(f"Error in delete_embed: {e}")
+        if not interaction.response.is_done():
+            await interaction.response.send_message("❌ An error occurred.", ephemeral=True)
+
+class ConfirmDeleteView(discord.ui.View):
+    def __init__(self, embed_name):
+        super().__init__(timeout=60)
+        self.embed_name = embed_name
+
+    @discord.ui.button(label="Yes, Delete", style=discord.ButtonStyle.danger, emoji="✅")
+    async def confirm_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            data = load_data()
+            
+            if self.embed_name in data.get('stored_embeds', {}):
+                del data['stored_embeds'][self.embed_name]
+                save_data(data)
+                await interaction.response.send_message(f"✅ **Embed `{self.embed_name}` has been deleted successfully!**", ephemeral=True)
+            else:
+                await interaction.response.send_message("❌ Embed not found or already deleted.", ephemeral=True)
+        except Exception as e:
+            print(f"Error in confirm delete: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ Error deleting embed.", ephemeral=True)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("❌ Delete operation cancelled.", ephemeral=True)
 
 # Run the bot
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
