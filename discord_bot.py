@@ -256,9 +256,7 @@ class FieldModal(discord.ui.Modal, title="Add Field"):
                 self.embed_data['fields'].append(field_data)
                 action_text = "added"
 
-            # Get editing_embed_id from embed_data if it exists
-            editing_embed_id = getattr(self, 'editing_embed_id', None)
-            view = EmbedOptionsView(self.embed_data, editing_embed_id)
+            view = EmbedOptionsView(self.embed_data, self.editing_embed_id)
             await interaction.response.send_message(f"✅ Field {action_text}! Continue editing:", view=view, ephemeral=True)
         except Exception as e:
             print(f"Error in FieldModal submit: {e}")
@@ -305,6 +303,32 @@ class EmbedOptionsView(discord.ui.View):
             modal = SoundButtonModal(self.embed_data, editing_embed_id=self.editing_embed_id)
             await interaction.followup.send("Opening sound button creation modal...", ephemeral=True)
 
+    @discord.ui.button(label="Add Field", style=discord.ButtonStyle.secondary, emoji="📝")
+    async def add_field(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            modal = FieldModal(self.embed_data, editing_embed_id=self.editing_embed_id)
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            print(f"Error in add_field: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error opening field modal. Please try again.", ephemeral=True)
+            except:
+                pass
+
+    @discord.ui.button(label="Add Author", style=discord.ButtonStyle.secondary, emoji="👤")
+    async def add_author(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            modal = AuthorModal(self.embed_data, self.editing_embed_id)
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            print(f"Error in add_author: {e}")
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message("❌ Error opening author modal. Please try again.", ephemeral=True)
+            except:
+                pass
+
     @discord.ui.button(label="Add Image", style=discord.ButtonStyle.secondary, emoji="🖼️")
     async def add_image(self, interaction: discord.Interaction, button: discord.ui.Button):
         try:
@@ -317,6 +341,16 @@ class EmbedOptionsView(discord.ui.View):
                     await interaction.response.send_message("❌ Error opening image modal. Please try again.", ephemeral=True)
             except:
                 pass
+
+    @discord.ui.button(label="Manage Fields", style=discord.ButtonStyle.secondary, emoji="📝")
+    async def manage_fields(self, interaction: discord.Interaction, button: discord.ui.Button):
+        fields = self.embed_data.get('fields', [])
+        if not fields:
+            await interaction.response.send_message("No fields to manage! Add a field first using the 'Add Field' option.", ephemeral=True)
+            return
+
+        view = FieldManagerView(self.embed_data, self.editing_embed_id)
+        await interaction.response.send_message("**Field Manager:**\nSelect a field to edit or delete. All fields from your embed will be shown here:", view=view, ephemeral=True)
 
     @discord.ui.button(label="Manage Buttons", style=discord.ButtonStyle.secondary, emoji="🎛️")
     async def manage_buttons(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -988,16 +1022,16 @@ class FieldManagerView(discord.ui.View):
 
     @discord.ui.button(label="Edit Selected Field", style=discord.ButtonStyle.primary, emoji="✏️")
     async def edit_field(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not hasattr(self, 'selected_field_index'):
+        if self.selected_field_index is None:
             await interaction.response.send_message("❌ Please select a field first!", ephemeral=True)
             return
 
-        modal = FieldModal(self.embed_data, self.selected_field_index)
+        modal = FieldModal(self.embed_data, self.selected_field_index, self.editing_embed_id)
         await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="Delete Selected Field", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def delete_field(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not hasattr(self, 'selected_field_index'):
+        if self.selected_field_index is None:
             await interaction.response.send_message("❌ Please select a field first!", ephemeral=True)
             return
 
