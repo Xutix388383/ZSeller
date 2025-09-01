@@ -16,15 +16,20 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Verification Key
 VERIFICATION_KEY = "ZpofeVerifiedU"
 
-# Store verified users (in-memory, will reset on bot restart)
-verified_users = set()
-
 def add_verified_user(user_id: int):
-    """Add a user to the verified list."""
-    verified_users.add(user_id)
+    """Add a user to the verified list and save to file."""
+    data = load_data()
+    if 'verified_users' not in data:
+        data['verified_users'] = []
+    
+    if user_id not in data['verified_users']:
+        data['verified_users'].append(user_id)
+        save_data(data)
 
 def is_verified(interaction: discord.Interaction) -> bool:
     """Check if user is in the verified list."""
+    data = load_data()
+    verified_users = data.get('verified_users', [])
     return interaction.user.id in verified_users
 
 # Load bot data
@@ -36,11 +41,14 @@ def load_data():
                 data['stored_embeds'] = {}
             if 'embed_counter' not in data:
                 data['embed_counter'] = 1
+            if 'verified_users' not in data:
+                data['verified_users'] = []
             return data
     except (FileNotFoundError, json.JSONDecodeError):
         default_data = {
             "stored_embeds": {},
-            "embed_counter": 1
+            "embed_counter": 1,
+            "verified_users": []
         }
         save_data(default_data)
         return default_data
